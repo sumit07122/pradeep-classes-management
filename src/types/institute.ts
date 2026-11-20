@@ -90,26 +90,7 @@ export interface StudentFilterParams {
   pageSize?: number;
 }
 
-export type AttendanceStatus = "present" | "absent" | "late" | "leave";
 
-export interface AttendanceSession {
-  id: string;
-  batch_id: string;
-  batch_name?: string;
-  session_date: string;
-  taken_by?: string;
-  created_at?: string;
-}
-
-export interface AttendanceRecord {
-  id: string;
-  session_id: string;
-  student_id: string;
-  student_name?: string;
-  status: AttendanceStatus;
-  note?: string;
-  marked_at: string;
-}
 
 export interface FeeSummary {
   totalTarget: number;
