@@ -88,6 +88,11 @@ export const Timetable: React.FC = () => {
       return;
     }
 
+    if (formData.start_time >= formData.end_time) {
+      setErrorNotice("End time must be after start time. (Please use 24-hour format, e.g. 13:30 for 1:30 PM).");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorNotice(null);
     setSuccessNotice(null);
@@ -307,22 +312,27 @@ export const Timetable: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Start Time"
-                type="time"
-                required
-                value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-              />
+            <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Start Time (24h)"
+                  type="time"
+                  required
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                />
 
-              <Input
-                label="End Time"
-                type="time"
-                required
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-              />
+                <Input
+                  label="End Time (24h)"
+                  type="time"
+                  required
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Format: 24-hour clock (e.g. 09:00 for 9 AM, 13:30 for 1:30 PM, 17:00 for 5 PM).
+              </p>
             </div>
 
             <Select

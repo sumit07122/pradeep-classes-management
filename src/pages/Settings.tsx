@@ -214,18 +214,20 @@ export const Settings: React.FC = () => {
               value={instituteSettings.city || ""}
               onChange={(e) => setInstituteSettings({ ...instituteSettings, city: e.target.value })}
             />
-            <Input
-              label="State / Pincode"
-              value={`${instituteSettings.state || "Rajasthan"} - ${instituteSettings.pincode || "324005"}`}
-              onChange={(e) => {
-                const parts = e.target.value.split("-");
-                setInstituteSettings({
-                  ...instituteSettings,
-                  state: parts[0]?.trim() || "Rajasthan",
-                  pincode: parts[1]?.trim() || "324005",
-                });
-              }}
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="State"
+                placeholder="e.g. Maharashtra"
+                value={instituteSettings.state || ""}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, state: e.target.value })}
+              />
+              <Input
+                label="Pincode"
+                placeholder="e.g. 400001"
+                value={instituteSettings.pincode || ""}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, pincode: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="border-t border-slate-100 pt-6">

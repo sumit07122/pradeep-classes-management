@@ -161,3 +161,74 @@ alter table public.study_materials alter column institute_id set default '111111
 alter table public.announcements alter column institute_id set default '11111111-2222-3333-4444-555555555555'::uuid;
 alter table public.timetables alter column institute_id set default '11111111-2222-3333-4444-555555555555'::uuid;
 alter table public.institute_settings alter column institute_id set default '11111111-2222-3333-4444-555555555555'::uuid;
+
+-- 6. Institute Settings Columns & Academic Year Sync
+alter table public.institute_settings 
+  add column if not exists institute_name text default 'Pradeep Classes',
+  add column if not exists state text default 'Maharashtra',
+  add column if not exists pincode text default '400001',
+  add column if not exists academic_year text default '2026-2027',
+  add column if not exists default_pass_percentage numeric default 40.0,
+  add column if not exists fee_late_fine_daily numeric default 50.0,
+  add column if not exists currency_symbol text default '₹',
+  add column if not exists timezone text default 'Asia/Kolkata';
+
+-- 7. Positive Duration Guard on Timetable Scheduling
+create or replace function public.fn_check_timetable_conflicts()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_conflict_batch text;
+begin
+  if not new.is_active then
+    return new;
+  end if;
+
+  -- Validate positive duration (start < end)
+  if new.start_time >= new.end_time then
+    raise exception 'Invalid class timing: End time (%) must be strictly after start time (%). Note: Please use 24-hour time format (e.g. 13:30 for 1:30 PM).',
+      new.end_time, new.start_time;
+  end if;
+
+  -- 1. Check Teacher conflict
+  if new.teacher_id is not null then
+    select b.name into v_conflict_batch
+    from public.timetables t
+    join public.batches b on b.id = t.batch_id
+    where t.id != coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      and t.institute_id = new.institute_id
+      and t.teacher_id = new.teacher_id
+      and t.day_of_week = new.day_of_week
+      and t.is_active = true
+      and (new.start_time, new.end_time) overlaps (t.start_time, t.end_time)
+    limit 1;
+
+    if v_conflict_batch is not null then
+      raise exception 'Teacher scheduling conflict: Teacher is already scheduled for batch "%" on % between % and %',
+        v_conflict_batch, new.day_of_week, new.start_time, new.end_time;
+    end if;
+  end if;
+
+  -- 2. Check Room conflict
+  if new.room_number is not null and trim(new.room_number) != '' then
+    select b.name into v_conflict_batch
+    from public.timetables t
+    join public.batches b on b.id = t.batch_id
+    where t.id != coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      and t.institute_id = new.institute_id
+      and lower(trim(t.room_number)) = lower(trim(new.room_number))
+      and t.day_of_week = new.day_of_week
+      and t.is_active = true
+      and (new.start_time, new.end_time) overlaps (t.start_time, t.end_time)
+    limit 1;
+
+    if v_conflict_batch is not null then
+      raise exception 'Classroom conflict: Room "%" is already occupied by batch "%" on % between % and %',
+        new.room_number, v_conflict_batch, new.day_of_week, new.start_time, new.end_time;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;

@@ -41,7 +41,31 @@ export const settingsService = {
         .maybeSingle();
 
       if (error) throw error;
-      return { data: data as InstituteSettings | null };
+      if (!data) return { data: null };
+
+      const formatted: InstituteSettings = {
+        id: data.id,
+        institute_id: data.institute_id,
+        institute_name: data.institute_name || "Pradeep Classes",
+        tagline: data.tagline || "",
+        phone: data.phone || "",
+        email: data.email || "",
+        address: data.address || "",
+        city: data.city || "",
+        state: data.state || "",
+        pincode: data.pincode || "",
+        website: data.website || "",
+        logo_url: data.logo_url || null,
+        academic_year: data.academic_year || data.current_academic_year || "2026-2027",
+        default_pass_percentage: Number(data.default_pass_percentage || data.attendance_threshold || 40),
+        fee_late_fine_daily: Number(data.fee_late_fine_daily || 50),
+        currency_symbol: data.currency_symbol || "₹",
+        timezone: data.timezone || "Asia/Kolkata",
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      return { data: formatted };
     } catch (err: any) {
       return { data: null, error: err.message };
     }
@@ -80,18 +104,62 @@ export const settingsService = {
     }
 
     try {
+      const payload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (updates.institute_name !== undefined) payload.institute_name = updates.institute_name;
+      if (updates.tagline !== undefined) payload.tagline = updates.tagline;
+      if (updates.phone !== undefined) payload.phone = updates.phone;
+      if (updates.email !== undefined) payload.email = updates.email;
+      if (updates.address !== undefined) payload.address = updates.address;
+      if (updates.city !== undefined) payload.city = updates.city;
+      if (updates.state !== undefined) payload.state = updates.state;
+      if (updates.pincode !== undefined) payload.pincode = updates.pincode;
+      if (updates.website !== undefined) payload.website = updates.website;
+      if (updates.academic_year !== undefined) {
+        payload.academic_year = updates.academic_year;
+        payload.current_academic_year = updates.academic_year;
+      }
+      if (updates.default_pass_percentage !== undefined) {
+        payload.default_pass_percentage = updates.default_pass_percentage;
+        payload.attendance_threshold = updates.default_pass_percentage;
+      }
+      if (updates.fee_late_fine_daily !== undefined) {
+        payload.fee_late_fine_daily = updates.fee_late_fine_daily;
+      }
+
       const { data, error } = await supabase
         .from("institute_settings")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq("institute_id", DEFAULT_INSTITUTE_ID)
         .select()
         .single();
 
       if (error) throw error;
-      return { data: data as InstituteSettings };
+
+      return {
+        data: {
+          id: data.id,
+          institute_id: data.institute_id,
+          institute_name: data.institute_name || updates.institute_name || "Pradeep Classes",
+          tagline: data.tagline || "",
+          phone: data.phone || "",
+          email: data.email || "",
+          address: data.address || "",
+          city: data.city || "",
+          state: data.state || "",
+          pincode: data.pincode || "",
+          website: data.website || "",
+          logo_url: data.logo_url || null,
+          academic_year: data.academic_year || data.current_academic_year || "2026-2027",
+          default_pass_percentage: Number(data.default_pass_percentage || 40),
+          fee_late_fine_daily: Number(data.fee_late_fine_daily || 50),
+          currency_symbol: data.currency_symbol || "₹",
+          timezone: data.timezone || "Asia/Kolkata",
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        },
+      };
     } catch (err: any) {
       return { data: null, error: err.message };
     }
