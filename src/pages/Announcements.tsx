@@ -404,8 +404,7 @@ export const Announcements: React.FC = () => {
                 label="Target Audience"
                 options={[
                   { value: "all", label: "Everyone (All Members)" },
-                  { value: "students", label: "Students Only" },
-                  { value: "teachers", label: "Faculty Only" },
+                  { value: "staff", label: "Faculty / Staff Only" },
                   { value: "batch", label: "Specific Batch Only" },
                 ]}
                 value={form.target_role}
@@ -416,8 +415,8 @@ export const Announcements: React.FC = () => {
                 label="Priority Level"
                 options={[
                   { value: "normal", label: "Normal Notice" },
-                  { value: "high", label: "High Priority" },
                   { value: "urgent", label: "Urgent Alert" },
+                  { value: "announcement", label: "Official Announcement" },
                 ]}
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value as "normal" | "urgent" | "announcement" })}
