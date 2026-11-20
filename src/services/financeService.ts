@@ -1,0 +1,333 @@
+// src/services/financeService.ts
+// Financial ledger, expense tracking, and teacher payroll service
+import { getSupabase } from "../lib/supabase";
+import type {
+  FinancialDashboardSummary,
+  InstituteIncome,
+  InstituteExpense,
+  TeacherSalaryConfig,
+  TeacherPayroll,
+  CreateExpensePayload,
+  CreateIncomePayload,
+  DisbursePayrollPayload,
+} from "../types/finance";
+
+const INSTITUTE_ID = "11111111-2222-3333-4444-555555555555";
+
+/**
+ * Fetch high-level aggregated financial dashboard summary
+ */
+export async function getFinancialDashboard(
+  startDate?: string,
+  endDate?: string
+): Promise<FinancialDashboardSummary> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc(
+    "get_institute_financial_dashboard",
+    {
+      p_start_date: startDate || null,
+      p_end_date: endDate || null,
+    }
+  );
+
+  if (error) {
+    console.error("Error fetching financial dashboard RPC:", error);
+    throw new Error(error.message || "Failed to load financial dashboard");
+  }
+
+  return (
+    data || {
+      total_fees_billed: 0,
+      total_fees_collected: 0,
+      outstanding_dues: 0,
+      total_other_income: 0,
+      total_expenses: 0,
+      total_teacher_salaries_paid: 0,
+      net_operating_surplus: 0,
+      expenses_by_category: [],
+      incomes_by_method: [],
+      monthly_trends: [],
+    }
+  );
+}
+
+/**
+ * Fetch direct institute incomes (books, registration fees, other income)
+ */
+export async function getIncomes(): Promise<InstituteIncome[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("institute_incomes")
+    .select("*")
+    .eq("institute_id", INSTITUTE_ID)
+    .order("income_date", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching institute incomes:", error);
+    throw error;
+  }
+  return (data as InstituteIncome[]) || [];
+}
+
+/**
+ * Create a new direct institute income record
+ */
+export async function createIncome(
+  payload: CreateIncomePayload
+): Promise<InstituteIncome> {
+  const supabase = getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("institute_incomes")
+    .insert([
+      {
+        ...payload,
+        institute_id: INSTITUTE_ID,
+        recorded_by: user?.id || null,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating institute income:", error);
+    throw error;
+  }
+  return data as InstituteIncome;
+}
+
+/**
+ * Reverse an income transaction with audit reason
+ */
+export async function reverseIncome(id: string, reason: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("institute_incomes")
+    .update({
+      status: "reversed",
+      reversal_reason: reason,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error reversing income:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch institute operational expenses
+ */
+export async function getExpenses(): Promise<InstituteExpense[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("institute_expenses")
+    .select("*")
+    .eq("institute_id", INSTITUTE_ID)
+    .order("expense_date", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching institute expenses:", error);
+    throw error;
+  }
+  return (data as InstituteExpense[]) || [];
+}
+
+/**
+ * Upload an expense supporting receipt to Supabase Storage
+ */
+export async function uploadExpenseReceipt(file: File): Promise<string> {
+  const supabase = getSupabase();
+  const fileExt = file.name.split(".").pop();
+  const fileName = `receipt_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+  const filePath = `receipts/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("expense-receipts")
+    .upload(filePath, file);
+
+  if (uploadError) {
+    console.error("Error uploading expense receipt:", uploadError);
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from("expense-receipts")
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
+/**
+ * Record a new institute expense
+ */
+export async function createExpense(
+  payload: CreateExpensePayload,
+  receiptFile?: File
+): Promise<InstituteExpense> {
+  const supabase = getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let receiptUrl = payload.receipt_url || null;
+  if (receiptFile) {
+    receiptUrl = await uploadExpenseReceipt(receiptFile);
+  }
+
+  const { data, error } = await supabase
+    .from("institute_expenses")
+    .insert([
+      {
+        ...payload,
+        receipt_url: receiptUrl,
+        institute_id: INSTITUTE_ID,
+        recorded_by: user?.id || null,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error recording institute expense:", error);
+    throw error;
+  }
+  return data as InstituteExpense;
+}
+
+/**
+ * Reverse an approved expense with audit reason
+ */
+export async function reverseExpense(id: string, reason: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("institute_expenses")
+    .update({
+      status: "reversed",
+      reversal_reason: reason,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error reversing expense:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all teacher salary configurations
+ */
+export async function getTeacherSalaryConfigs(): Promise<TeacherSalaryConfig[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("teacher_salary_configs")
+    .select(`
+      *,
+      teachers (
+        full_name
+      )
+    `)
+    .eq("institute_id", INSTITUTE_ID);
+
+  if (error) {
+    console.error("Error fetching teacher salary configs:", error);
+    throw error;
+  }
+
+  return (data || []).map((row: any) => ({
+    ...row,
+    teacher_name: row.teachers?.full_name || "Faculty Member",
+  }));
+}
+
+/**
+ * Update or insert a teacher salary configuration
+ */
+export async function updateTeacherSalaryConfig(
+  teacherId: string,
+  calculationType: "monthly_fixed" | "per_lecture" | "hourly",
+  baseAmount: number,
+  perLectureRate: number
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("teacher_salary_configs")
+    .upsert(
+      {
+        institute_id: INSTITUTE_ID,
+        teacher_id: teacherId,
+        calculation_type: calculationType,
+        base_amount: baseAmount,
+        per_lecture_rate: perLectureRate,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "teacher_id" }
+    );
+
+  if (error) {
+    console.error("Error updating teacher salary config:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch teacher payroll sheets for a specific month
+ */
+export async function getTeacherPayrolls(
+  month?: string
+): Promise<TeacherPayroll[]> {
+  const supabase = getSupabase();
+  let query = supabase
+    .from("teacher_payrolls")
+    .select(`
+      *,
+      teachers (
+        full_name,
+        subject
+      )
+    `)
+    .eq("institute_id", INSTITUTE_ID)
+    .order("created_at", { ascending: false });
+
+  if (month) {
+    query = query.eq("payroll_month", month);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("Error fetching teacher payrolls:", error);
+    throw error;
+  }
+
+  return (data || []).map((row: any) => ({
+    ...row,
+    teacher_name: row.teachers?.full_name || "Faculty Member",
+    teacher_subject: row.teachers?.subject || "Academics",
+  }));
+}
+
+/**
+ * Disburse a teacher payroll sheet atomically
+ */
+export async function disbursePayroll(
+  payrollId: string,
+  payload: DisbursePayrollPayload
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("record_teacher_payroll_payment", {
+    p_payroll_id: payrollId,
+    p_payment_method: payload.payment_method,
+    p_transaction_reference: payload.transaction_reference || null,
+    p_notes: payload.notes || null,
+  });
+
+  if (error) {
+    console.error("Error disbursing teacher payroll:", error);
+    throw new Error(error.message || "Failed to process payroll disbursement");
+  }
+}
