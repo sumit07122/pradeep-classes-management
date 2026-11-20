@@ -1,108 +1,139 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Plus,
   Download,
-  MoreHorizontal,
-  ArrowUpRight,
+  ArrowRightLeft,
+  Edit2,
+  Eye,
+  Archive,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { studentsService } from "../services/studentsService";
+import { studentsService, type LiveBatchOption } from "../services/studentsService";
 import {
   Button,
-  Input,
-  Select,
-  Modal,
   Badge,
   EmptyState,
   LoadingSpinner,
   AlertNotice,
 } from "../components/common";
-import { useAuth } from "../hooks/useAuth";
-import type { Student } from "../types";
+import { AdmissionModal } from "../components/students/AdmissionModal";
+import { StudentDetailDrawer } from "../components/students/StudentDetailDrawer";
+import { BatchTransferModal } from "../components/students/BatchTransferModal";
+import { StudentEditModal } from "../components/students/StudentEditModal";
+import { exportStudentsToCSV } from "../utils/csvExport";
+import type { Student, StudentStatus } from "../types";
+
+const CLASSES = ["All", "Class 12", "Class 11", "Class 10", "Class 9", "Dropper / Repeaters"];
+const STATUSES = ["All", "Active", "On hold", "Inactive"] as const;
 
 export const Students: React.FC = () => {
-  const { isDemoMode } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [selectedBatch, setSelectedBatch] = useState("All");
-  const [showAddModal, setShowAddModal] = useState(false);
   const [notice, setNotice] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // New student form state
-  const [fullName, setFullName] = useState("");
-  const [className, setClassName] = useState("Class 12");
-  const [batchName, setBatchName] = useState("JEE Morning");
-  const [phone, setPhone] = useState("");
-  const [parentName, setParentName] = useState("");
-  const [parentPhone, setParentPhone] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Filters & Search
+  const [query, setQuery] = useState("");
+  const [selectedBatchId, setSelectedBatchId] = useState("All");
+  const [selectedClass, setSelectedClass] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState<StudentStatus | "All">("All");
 
-  const availableBatches = studentsService.getAvailableBatches();
+  // Pagination
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
 
+  // Batches for filter
+  const [batches, setBatches] = useState<LiveBatchOption[]>([]);
+
+  // Modals & Drawers
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedStudentForDrawer, setSelectedStudentForDrawer] = useState<Student | null>(null);
+  const [selectedStudentForTransfer, setSelectedStudentForTransfer] = useState<Student | null>(null);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null);
+
+  // Load batches on mount
+  useEffect(() => {
+    async function fetchBatches() {
+      const list = await studentsService.getLiveBatches();
+      setBatches(list);
+    }
+    fetchBatches();
+  }, []);
+
+  // Load students on filters/page change
   const loadStudents = async () => {
     setLoading(true);
-    const res = await studentsService.getStudents();
+    const res = await studentsService.getStudents({
+      query,
+      batchId: selectedBatchId,
+      className: selectedClass,
+      status: selectedStatus,
+      page,
+      pageSize,
+    });
+
     setStudents(res.data);
+    setTotalCount(res.totalCount);
     setLoading(false);
   };
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [query, selectedBatchId, selectedClass, selectedStatus, page]);
 
-  const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
-      const matchesQuery = `${s.full_name} ${s.admission_no} ${s.batch_name} ${s.class_name} ${s.phone}`
-        .toLowerCase()
-        .includes(query.toLowerCase());
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-      const matchesBatch = selectedBatch === "All" || s.batch_name === selectedBatch;
-      return matchesQuery && matchesBatch;
+  const handleStudentAdded = (newStudent: Student) => {
+    setNotice({
+      message: `Student ${newStudent.full_name} enrolled successfully with Admission ID ${newStudent.admission_no}.`,
+      type: "success",
     });
-  }, [students, query, selectedBatch]);
+    setPage(1);
+    loadStudents();
+  };
 
-  const handleAddStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim()) return;
-
-    setIsSubmitting(true);
-    const res = await studentsService.createStudent({
-      full_name: fullName.trim(),
-      class_name: className,
-      batch_name: batchName,
-      phone: phone.trim(),
-      parent_name: parentName.trim() || undefined,
-      parent_phone: parentPhone.trim() || undefined,
+  const handleStudentUpdated = (updated: Student) => {
+    setNotice({
+      message: `Student ${updated.full_name} updated successfully.`,
+      type: "success",
     });
-    setIsSubmitting(false);
+    if (selectedStudentForDrawer?.id === updated.id) {
+      setSelectedStudentForDrawer(updated);
+    }
+    loadStudents();
+  };
 
-    if (res.error || !res.data) {
-      setNotice({ message: res.error || "Failed to save student.", type: "error" });
+  const handleTransferSuccess = () => {
+    setNotice({
+      message: "Batch transfer completed and recorded in audit history.",
+      type: "success",
+    });
+    loadStudents();
+  };
+
+  const handleArchiveStudent = async (student: Student) => {
+    if (!confirm(`Are you sure you want to deactivate student ${student.full_name}?`)) {
       return;
     }
 
-    setStudents((prev) => [res.data!, ...prev]);
-    setShowAddModal(false);
-    // Reset form
-    setFullName("");
-    setPhone("");
-    setParentName("");
-    setParentPhone("");
+    const res = await studentsService.archiveStudent(student.id);
+    if (!res.success) {
+      setNotice({ message: res.error || "Failed to archive student.", type: "error" });
+    } else {
+      setNotice({ message: `Student ${student.full_name} deactivated.`, type: "success" });
+      loadStudents();
+    }
+  };
 
-    setNotice({
-      message: isDemoMode
-        ? "Student added in DEMO mode (in-memory). Configure Supabase to persist live student records."
-        : `Student ${res.data.full_name} saved successfully with Admission ID ${res.data.admission_no}.`,
-      type: "success",
-    });
-
-    window.setTimeout(() => setNotice(null), 6000);
+  const handleExport = () => {
+    exportStudentsToCSV(students);
   };
 
   return (
     <div className="space-y-5">
-      {/* Top Banner Notice */}
+      {/* Notice Banner */}
       {notice && (
         <AlertNotice
           type={notice.type}
@@ -116,67 +147,109 @@ export const Students: React.FC = () => {
         <div>
           <div className="eyebrow">STUDENT DIRECTORY</div>
           <h1>Student Management</h1>
-          <p>Manage student profiles, admissions, batch allocations and records.</p>
+          <p>
+            Manage student admissions, batch allocations, academic details, and transfer histories.
+          </p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => setShowAddModal(true)}
-          icon={<Plus size={16} />}
-        >
-          Add new student
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            icon={<Download size={15} />}
+          >
+            Export CSV
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => setShowAddModal(true)}
+            icon={<Plus size={16} />}
+          >
+            New Admission
+          </Button>
+        </div>
       </div>
 
-      {/* Directory Panel */}
-      <section className="panel directory-panel">
-        {/* Toolbar */}
-        <div className="directory-toolbar flex-wrap gap-3">
-          <div className="search-box min-w-[280px]">
+      {/* Directory Filter Toolbar */}
+      <section className="panel directory-panel p-4 space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Search Box */}
+          <div className="search-box flex-1 min-w-[280px]">
             <Search size={16} />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by student name, admission no., or mobile..."
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by student name, admission ID, mobile, or guardian..."
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Live Batch Filter */}
             <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
+              value={selectedBatchId}
+              onChange={(e) => {
+                setSelectedBatchId(e.target.value);
+                setPage(1);
+              }}
               className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white outline-none focus:border-[#16466f]"
             >
               <option value="All">All Batches</option>
-              {availableBatches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
             </select>
 
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Download size={14} />}
-              onClick={() => alert("Export feature will be available in milestone 2.")}
+            {/* Class Filter */}
+            <select
+              value={selectedClass}
+              onChange={(e) => {
+                setSelectedClass(e.target.value);
+                setPage(1);
+              }}
+              className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white outline-none focus:border-[#16466f]"
             >
-              Export
-            </Button>
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {c === "All" ? "All Classes" : c}
+                </option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value as any);
+                setPage(1);
+              }}
+              className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white outline-none focus:border-[#16466f]"
+            >
+              {STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {st === "All" ? "All Statuses" : st}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content Table */}
         {loading ? (
-          <LoadingSpinner label="Loading student directory..." />
-        ) : filteredStudents.length === 0 ? (
+          <LoadingSpinner label="Loading student records from Supabase..." />
+        ) : students.length === 0 ? (
           <EmptyState
             title="No students match criteria"
             description={
-              query
-                ? `No students found matching "${query}". Try adjusting your search keyword or batch filter.`
-                : "No students are currently enrolled in Pradeep Classes. Click Add Student to register a new admission."
+              query || selectedBatchId !== "All" || selectedClass !== "All" || selectedStatus !== "All"
+                ? "No student records found matching the applied search filters. Try adjusting keywords or filters."
+                : "No students are currently enrolled. Click New Admission to register a student."
             }
-            actionLabel="Add new student"
+            actionLabel="New Admission"
             onAction={() => setShowAddModal(true)}
           />
         ) : (
@@ -190,15 +263,17 @@ export const Students: React.FC = () => {
                   <th>ASSIGNED BATCH</th>
                   <th>MOBILE NO.</th>
                   <th>STATUS</th>
-                  {isDemoMode && <th>MODE</th>}
-                  <th />
+                  <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((s) => (
-                  <tr key={s.id}>
+                {students.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                     <td>
-                      <div className="student-cell">
+                      <div
+                        className="student-cell cursor-pointer"
+                        onClick={() => setSelectedStudentForDrawer(s)}
+                      >
                         <div className="student-avatar">
                           {s.full_name
                             .split(" ")
@@ -207,41 +282,79 @@ export const Students: React.FC = () => {
                             .join("")}
                         </div>
                         <div>
-                          <b>{s.full_name}</b>
+                          <b className="hover:text-[#16466f] transition-colors">{s.full_name}</b>
                           {s.parent_name && (
                             <small className="block text-[10px] text-slate-400">
-                              P: {s.parent_name}
+                              Guardian: {s.parent_name}
                             </small>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="muted-cell font-mono text-[11px]">{s.admission_no}</td>
-                    <td>{s.class_name}</td>
-                    <td>
-                      <span className="font-semibold text-slate-700">{s.batch_name}</span>
+
+                    <td className="font-mono text-xs font-semibold text-slate-700">
+                      {s.admission_no}
                     </td>
-                    <td>{s.phone}</td>
+
+                    <td className="text-xs text-slate-600 font-medium">{s.class_name}</td>
+
+                    <td>
+                      <span className="font-bold text-xs text-[#16466f] bg-[#16466f]/10 px-2 py-0.5 rounded">
+                        {s.batch_name || "Unassigned"}
+                      </span>
+                    </td>
+
+                    <td className="text-xs text-slate-600">{s.phone}</td>
+
                     <td>
                       <Badge
-                        variant={s.status === "Active" ? "success" : "warning"}
+                        variant={
+                          s.status === "Active"
+                            ? "success"
+                            : s.status === "On hold"
+                            ? "warning"
+                            : "neutral"
+                        }
                         size="sm"
                         showDot
                       >
                         {s.status}
                       </Badge>
                     </td>
-                    {isDemoMode && (
-                      <td>
-                        <Badge variant="demo" size="sm">
-                          DEMO
-                        </Badge>
-                      </td>
-                    )}
+
                     <td>
-                      <button className="more-button" aria-label="Student actions">
-                        <MoreHorizontal size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setSelectedStudentForDrawer(s)}
+                          className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded-md transition-colors"
+                          title="View Profile"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => setSelectedStudentForTransfer(s)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                          title="Transfer Batch"
+                        >
+                          <ArrowRightLeft size={15} />
+                        </button>
+                        <button
+                          onClick={() => setSelectedStudentForEdit(s)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                          title="Edit Student"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                        {s.status === "Active" && (
+                          <button
+                            onClick={() => handleArchiveStudent(s)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                            title="Deactivate Student"
+                          >
+                            <Archive size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -250,92 +363,71 @@ export const Students: React.FC = () => {
           </div>
         )}
 
-        <div className="table-footer">
-          <span>
-            Showing <b>{filteredStudents.length}</b> of <b>{students.length}</b> student records
-          </span>
-          <span>Page 1 of 1</span>
+        {/* Pagination Bar */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
+          <div>
+            Showing {(page - 1) * pageSize + 1} to{" "}
+            {Math.min(page * pageSize, totalCount)} of {totalCount} students
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ChevronLeft size={14} />}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+            <span className="font-semibold text-slate-700">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ChevronRight size={14} />}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </section>
 
-      {/* Add Student Modal */}
-      <Modal
+      {/* New Admission Modal */}
+      <AdmissionModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Register New Student"
-        subtitle="STUDENT ADMISSION"
-      >
-        <form onSubmit={handleAddStudent} className="space-y-4">
-          <Input
-            label="Student Full Name"
-            required
-            autoFocus
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="e.g. Aarav Sharma"
-          />
+        onSuccess={handleStudentAdded}
+      />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Course / Class"
-              options={["Class 10", "Class 11", "Class 12", "JEE Foundation", "NEET Medical"]}
-              value={className}
-              onChange={(e) => setClassName(e.target.value)}
-            />
+      {/* Student Detail Drawer */}
+      <StudentDetailDrawer
+        isOpen={Boolean(selectedStudentForDrawer)}
+        onClose={() => setSelectedStudentForDrawer(null)}
+        student={selectedStudentForDrawer}
+        onEdit={(st) => setSelectedStudentForEdit(st)}
+        onTransfer={(st) => setSelectedStudentForTransfer(st)}
+        onArchived={loadStudents}
+      />
 
-            <Select
-              label="Assigned Batch"
-              options={availableBatches}
-              value={batchName}
-              onChange={(e) => setBatchName(e.target.value)}
-            />
-          </div>
+      {/* Batch Transfer Modal */}
+      <BatchTransferModal
+        isOpen={Boolean(selectedStudentForTransfer)}
+        onClose={() => setSelectedStudentForTransfer(null)}
+        student={selectedStudentForTransfer}
+        onSuccess={handleTransferSuccess}
+      />
 
-          <Input
-            label="Student Mobile Number"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="10-digit mobile number"
-            maxLength={10}
-          />
-
-          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
-            <Input
-              label="Parent / Guardian Name"
-              value={parentName}
-              onChange={(e) => setParentName(e.target.value)}
-              placeholder="e.g. Rajesh Sharma"
-            />
-            <Input
-              label="Parent Mobile"
-              type="tel"
-              value={parentPhone}
-              onChange={(e) => setParentPhone(e.target.value)}
-              placeholder="Emergency contact"
-              maxLength={10}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowAddModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isSubmitting}
-              icon={<ArrowUpRight size={15} />}
-            >
-              Save student record
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {/* Student Edit Modal */}
+      <StudentEditModal
+        isOpen={Boolean(selectedStudentForEdit)}
+        onClose={() => setSelectedStudentForEdit(null)}
+        student={selectedStudentForEdit}
+        onSuccess={handleStudentUpdated}
+      />
     </div>
   );
 };

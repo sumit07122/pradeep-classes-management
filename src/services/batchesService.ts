@@ -1,20 +1,36 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { batches as demoBatchNames } from "../data/demo";
-import type { Batch } from "../types";
+import type { Batch, Student } from "../types";
 
 export const batchesService = {
   async getBatches(): Promise<{ data: Batch[]; error?: string; isDemo: boolean }> {
     if (!isSupabaseConfigured || !supabase) {
-      const demoBatches: Batch[] = demoBatchNames.map((name, i) => ({
-        id: `demo-batch-${i + 1}`,
-        name,
-        course_name: name.includes("JEE") ? "JEE Advanced" : name.includes("NEET") ? "NEET Medical" : "Board Foundations",
-        academic_year: "2026-2027",
-        student_count: [42, 36, 28, 21][i] || 25,
-        assigned_teachers: [["Amit Kumar"], ["Neha Sharma"], ["Rahul Mishra"], ["Amit Kumar"]][i],
-        is_active: true,
-        is_demo: true,
-      }));
+      const demoBatches: Batch[] = demoBatchNames.map((name, i) => {
+        const studentCount = [42, 36, 28, 21][i] || 25;
+        const maxCapacity = 40;
+        return {
+          id: `demo-batch-${i + 1}`,
+          name,
+          course_name: name.includes("JEE")
+            ? "JEE Advanced"
+            : name.includes("NEET")
+            ? "NEET Medical"
+            : "Foundation 10th",
+          academic_year: "2026-2027",
+          max_capacity: maxCapacity,
+          timing: "08:00 AM - 11:30 AM",
+          room_number: `Room ${101 + i}`,
+          status: "active",
+          student_count: studentCount,
+          capacity_percentage: Math.min(100, Math.round((studentCount / maxCapacity) * 100)),
+          assigned_teachers: [["Amit Kumar"], ["Neha Sharma"], ["Rahul Mishra"], ["Amit Kumar"]][i],
+          teacher_assignments: [
+            { id: "t1", full_name: "Amit Kumar", subject: "Physics" },
+          ],
+          is_active: true,
+          is_demo: true,
+        };
+      });
       return { data: demoBatches, isDemo: true };
     }
 
@@ -22,13 +38,14 @@ export const batchesService = {
       const { data, error } = await supabase
         .from("batches")
         .select(`
-          id, name, course_name, academic_year, is_active,
+          id, name, course_name, academic_year, max_capacity,
+          timing, room_number, start_date, end_date, status, is_active, institute_id,
           students ( count ),
           teacher_batches (
-            teachers ( full_name )
+            teachers ( id, full_name, subject )
           )
         `)
-        .order("name");
+        .order("created_at", { ascending: false });
 
       if (error) {
         return { data: [], error: error.message, isDemo: false };
@@ -36,18 +53,30 @@ export const batchesService = {
 
       const mapped: Batch[] = (data || []).map((row: any) => {
         const studentCount = row.students?.[0]?.count || 0;
-        const teachers = (row.teacher_batches || [])
-          .map((tb: any) => tb.teachers?.full_name)
+        const maxCap = row.max_capacity || 40;
+        const teachersList = (row.teacher_batches || [])
+          .map((tb: any) => tb.teachers)
           .filter(Boolean);
+
+        const teacherNames = teachersList.map((t: any) => t.full_name);
 
         return {
           id: row.id,
           name: row.name,
           course_name: row.course_name,
           academic_year: row.academic_year || "2026-2027",
+          max_capacity: maxCap,
+          timing: row.timing || "Not specified",
+          room_number: row.room_number || "Unassigned",
+          start_date: row.start_date,
+          end_date: row.end_date,
+          status: row.status || (row.is_active ? "active" : "archived"),
           student_count: studentCount,
-          assigned_teachers: teachers,
+          capacity_percentage: Math.min(100, Math.round((studentCount / maxCap) * 100)),
+          assigned_teachers: teacherNames,
+          teacher_assignments: teachersList,
           is_active: row.is_active ?? true,
+          institute_id: row.institute_id,
           is_demo: false,
         };
       });
@@ -59,42 +88,229 @@ export const batchesService = {
   },
 
   async createBatch(
-    batch: Omit<Batch, "id" | "is_demo">
+    batch: Omit<Batch, "id" | "is_demo" | "student_count" | "capacity_percentage" | "assigned_teachers" | "teacher_assignments">
   ): Promise<{ data: Batch | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
       const newBatch: Batch = {
         id: crypto.randomUUID(),
         ...batch,
+        student_count: 0,
+        capacity_percentage: 0,
+        assigned_teachers: [],
+        teacher_assignments: [],
         is_demo: true,
       };
       return { data: newBatch };
     }
 
-    const { data, error } = await supabase
-      .from("batches")
-      .insert({
-        name: batch.name,
-        course_name: batch.course_name,
-        academic_year: batch.academic_year || "2026-2027",
-        is_active: true,
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("batches")
+        .insert({
+          name: batch.name.trim(),
+          course_name: batch.course_name,
+          academic_year: batch.academic_year || "2026-2027",
+          max_capacity: batch.max_capacity || 40,
+          timing: batch.timing?.trim() || null,
+          room_number: batch.room_number?.trim() || null,
+          start_date: batch.start_date || null,
+          end_date: batch.end_date || null,
+          status: batch.status || "active",
+        })
+        .select()
+        .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+      if (error) {
+        return { data: null, error: error.message };
+      }
+
+      return {
+        data: {
+          id: data.id,
+          name: data.name,
+          course_name: data.course_name,
+          academic_year: data.academic_year,
+          max_capacity: data.max_capacity,
+          timing: data.timing,
+          room_number: data.room_number,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          status: data.status,
+          student_count: 0,
+          capacity_percentage: 0,
+          assigned_teachers: [],
+          teacher_assignments: [],
+          is_active: data.is_active,
+          is_demo: false,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err?.message || "Failed to create batch" };
+    }
+  },
+
+  async updateBatch(
+    id: string,
+    updates: Partial<Batch>
+  ): Promise<{ data: Batch | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: "Demo mode update not supported." };
     }
 
-    return {
-      data: {
-        id: data.id,
-        name: data.name,
-        course_name: data.course_name,
-        academic_year: data.academic_year,
-        student_count: 0,
-        is_active: true,
-        is_demo: false,
-      },
-    };
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined) payload.name = updates.name.trim();
+      if (updates.course_name !== undefined) payload.course_name = updates.course_name;
+      if (updates.academic_year !== undefined) payload.academic_year = updates.academic_year;
+      if (updates.max_capacity !== undefined) payload.max_capacity = updates.max_capacity;
+      if (updates.timing !== undefined) payload.timing = updates.timing?.trim() || null;
+      if (updates.room_number !== undefined) payload.room_number = updates.room_number?.trim() || null;
+      if (updates.start_date !== undefined) payload.start_date = updates.start_date || null;
+      if (updates.end_date !== undefined) payload.end_date = updates.end_date || null;
+      if (updates.status !== undefined) payload.status = updates.status;
+
+      const { data, error } = await supabase
+        .from("batches")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        return { data: null, error: error.message };
+      }
+
+      return {
+        data: {
+          id: data.id,
+          name: data.name,
+          course_name: data.course_name,
+          academic_year: data.academic_year,
+          max_capacity: data.max_capacity,
+          timing: data.timing,
+          room_number: data.room_number,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          status: data.status,
+          is_active: data.is_active,
+          is_demo: false,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err?.message || "Failed to update batch" };
+    }
+  },
+
+  async archiveBatch(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: true };
+    }
+
+    try {
+      const { error } = await supabase
+        .from("batches")
+        .update({ status: "archived" })
+        .eq("id", id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to archive batch" };
+    }
+  },
+
+  async getBatchRoster(batchId: string): Promise<{ data: Student[]; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: [] };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("batch_id", batchId)
+        .order("full_name");
+
+      if (error) {
+        return { data: [], error: error.message };
+      }
+
+      const mapped: Student[] = (data || []).map((row) => ({
+        id: row.id,
+        admission_no: row.admission_no,
+        full_name: row.full_name,
+        class_name: row.class_name,
+        batch_name: row.batch_name || "Unassigned",
+        batch_id: row.batch_id,
+        phone: row.phone || "",
+        email: row.email,
+        parent_name: row.parent_name,
+        parent_phone: row.parent_phone,
+        status:
+          row.status === "active"
+            ? "Active"
+            : row.status === "on_hold"
+            ? "On hold"
+            : "Inactive",
+        joined_on: row.joined_on,
+        created_at: row.created_at,
+      }));
+
+      return { data: mapped };
+    } catch (err: any) {
+      return { data: [], error: err?.message || "Failed to fetch batch roster" };
+    }
+  },
+
+  async assignTeacher(
+    batchId: string,
+    teacherId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: true };
+    }
+
+    try {
+      const { error } = await supabase
+        .from("teacher_batches")
+        .insert({
+          batch_id: batchId,
+          teacher_id: teacherId,
+        });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to assign teacher" };
+    }
+  },
+
+  async removeTeacher(
+    batchId: string,
+    teacherId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: true };
+    }
+
+    try {
+      const { error } = await supabase
+        .from("teacher_batches")
+        .delete()
+        .eq("batch_id", batchId)
+        .eq("teacher_id", teacherId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to remove teacher" };
+    }
   },
 };
