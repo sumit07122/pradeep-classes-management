@@ -63,6 +63,17 @@ export interface BatchDefaulter {
   attendance_percentage: number;
 }
 
+export interface AttendanceDefaulter {
+  student_id: string;
+  student_name: string;
+  admission_no: string;
+  batch_name: string;
+  attended_sessions?: number;
+  total_sessions?: number;
+  percentage: number;
+  is_defaulter?: boolean;
+}
+
 export interface SaveAttendancePayload {
   batch_id: string;
   session_date: string;

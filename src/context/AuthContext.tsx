@@ -25,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<UserRole>(() => {
     if (env.isDev) {
       const saved = localStorage.getItem(DEV_ROLE_STORAGE_KEY) as UserRole | null;
-      if (saved && ["owner", "admin", "teacher", "student", "parent"].includes(saved)) {
+      if (saved && ["owner", "admin", "teacher", "student"].includes(saved)) {
         return saved;
       }
     }

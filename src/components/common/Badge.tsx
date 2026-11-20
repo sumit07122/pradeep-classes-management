@@ -6,12 +6,17 @@ export type BadgeVariant =
   | "danger"
   | "info"
   | "neutral"
-  | "demo";
+  | "demo"
+  | "green"
+  | "red"
+  | "amber"
+  | "blue"
+  | "violet";
 
 export interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   showDot?: boolean;
   className?: string;
 }
@@ -25,25 +30,36 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => {
   const variantClasses: Record<BadgeVariant, string> = {
     success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
     warning: "bg-amber-50 text-amber-700 border-amber-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
     danger: "bg-rose-50 text-rose-700 border-rose-200",
+    red: "bg-rose-50 text-rose-700 border-rose-200",
     info: "bg-sky-50 text-sky-700 border-sky-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-200",
     neutral: "bg-slate-100 text-slate-700 border-slate-200",
     demo: "bg-purple-100 text-purple-700 border-purple-300 font-bold tracking-wider",
+    violet: "bg-purple-100 text-purple-700 border-purple-300 font-bold tracking-wider",
   };
 
   const dotClasses: Record<BadgeVariant, string> = {
     success: "bg-emerald-500",
+    green: "bg-emerald-500",
     warning: "bg-amber-500",
+    amber: "bg-amber-500",
     danger: "bg-rose-500",
+    red: "bg-rose-500",
     info: "bg-sky-500",
+    blue: "bg-sky-500",
     neutral: "bg-slate-400",
     demo: "bg-purple-500",
+    violet: "bg-purple-500",
   };
 
   const sizeClasses = {
     sm: "px-2 py-0.5 text-[10px]",
     md: "px-2.5 py-1 text-xs",
+    lg: "px-3 py-1.5 text-xs font-bold",
   };
 
   return (

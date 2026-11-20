@@ -2,3 +2,8 @@ export * from "./auth";
 export * from "./institute";
 export * from "./attendance";
 export * from "./fees";
+export * from "./academics";
+export * from "./materials";
+export * from "./timetable";
+export * from "./communication";
+export * from "./settings";

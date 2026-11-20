@@ -1,4 +1,4 @@
-export type UserRole = "owner" | "admin" | "teacher" | "student" | "parent";
+export type UserRole = "owner" | "admin" | "teacher" | "student";
 
 export interface UserProfile {
   id: string;
@@ -6,6 +6,7 @@ export interface UserProfile {
   email?: string;
   phone?: string;
   role: UserRole;
+  institute_id?: string;
   created_at?: string;
   is_active?: boolean;
 }
@@ -26,7 +27,11 @@ export interface RolePermissions {
   canManageAttendance: boolean;
   canMarkAttendance: boolean;
   canManageFees: boolean;
-  canViewAcademics: boolean;
+  canManageExams: boolean;
+  canManageHomework: boolean;
+  canManageTimetable: boolean;
+  canManageAnnouncements: boolean;
+  canViewReports: boolean;
   canViewStudentPortal: boolean;
 }
 
@@ -39,7 +44,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageAttendance: true,
     canMarkAttendance: true,
     canManageFees: true,
-    canViewAcademics: true,
+    canManageExams: true,
+    canManageHomework: true,
+    canManageTimetable: true,
+    canManageAnnouncements: true,
+    canViewReports: true,
     canViewStudentPortal: false,
   },
   admin: {
@@ -50,7 +59,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageAttendance: true,
     canMarkAttendance: true,
     canManageFees: true,
-    canViewAcademics: true,
+    canManageExams: true,
+    canManageHomework: true,
+    canManageTimetable: true,
+    canManageAnnouncements: true,
+    canViewReports: true,
     canViewStudentPortal: false,
   },
   teacher: {
@@ -61,7 +74,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageAttendance: false,
     canMarkAttendance: true,
     canManageFees: false,
-    canViewAcademics: true,
+    canManageExams: true,
+    canManageHomework: true,
+    canManageTimetable: false,
+    canManageAnnouncements: true,
+    canViewReports: false,
     canViewStudentPortal: false,
   },
   student: {
@@ -72,18 +89,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageAttendance: false,
     canMarkAttendance: false,
     canManageFees: false,
-    canViewAcademics: true,
-    canViewStudentPortal: true,
-  },
-  parent: {
-    canManageInstitute: false,
-    canManageStudents: false,
-    canManageTeachers: false,
-    canManageBatches: false,
-    canManageAttendance: false,
-    canMarkAttendance: false,
-    canManageFees: false,
-    canViewAcademics: true,
+    canManageExams: false,
+    canManageHomework: false,
+    canManageTimetable: false,
+    canManageAnnouncements: false,
+    canViewReports: false,
     canViewStudentPortal: true,
   },
 };

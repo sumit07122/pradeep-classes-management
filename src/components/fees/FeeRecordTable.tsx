@@ -11,6 +11,7 @@ interface FeeRecordTableProps {
   onSearchChange: (q: string) => void;
   onCollectPayment: (record: FeeRecord) => void;
   onViewReceipt: (record: FeeRecord) => void;
+  onViewHistory?: (record: FeeRecord) => void;
   canManageFees: boolean;
 }
 
@@ -22,6 +23,7 @@ export const FeeRecordTable: React.FC<FeeRecordTableProps> = ({
   onSearchChange,
   onCollectPayment,
   onViewReceipt,
+  onViewHistory,
   canManageFees,
 }) => {
   const filterTabs: { label: string; value: FeeStatus | 'all' }[] = [
@@ -164,6 +166,17 @@ export const FeeRecordTable: React.FC<FeeRecordTableProps> = ({
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {canManageFees && onViewHistory && (
+                          <button
+                            type="button"
+                            onClick={() => onViewHistory(r)}
+                            className="p-1.5 text-slate-400 hover:text-[#16466f] transition rounded"
+                            title="Payment History & Reversals"
+                          >
+                            <IndianRupee size={13} />
+                          </button>
+                        )}
+
                         {hasReceipt && (
                           <Button
                             variant="outline"

@@ -9,7 +9,7 @@ export const Unauthorized: React.FC = () => {
   const navigate = useNavigate();
 
   const handleReturnHome = () => {
-    if (role === "student" || role === "parent") {
+    if (role === "student") {
       navigate("/portal");
     } else {
       navigate("/dashboard");

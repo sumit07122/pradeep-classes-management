@@ -421,6 +421,36 @@ export const feesService = {
   },
 
   /**
+   * Reverse an existing fee payment (authorized staff only)
+   */
+  async reversePayment(
+    paymentId: string,
+    reason: string
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return {
+        success: true,
+        data: {
+          reversal_receipt_no: `REV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+          new_status: "pending",
+        },
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.rpc("reverse_fee_payment", {
+        p_payment_id: paymentId,
+        p_reason: reason,
+      });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  /**
    * Export fee records to CSV
    */
   exportFeeLedgerCsv(records: FeeRecord[]): void {

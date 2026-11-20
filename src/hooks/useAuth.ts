@@ -9,7 +9,6 @@ export function useAuth(): AuthContextType & {
   isAdmin: boolean;
   isTeacher: boolean;
   isStudent: boolean;
-  isParent: boolean;
   isStaff: boolean;
 } {
   const context = useContext(AuthContext);
@@ -31,7 +30,6 @@ export function useAuth(): AuthContextType & {
     isAdmin: role === "admin",
     isTeacher: role === "teacher",
     isStudent: role === "student",
-    isParent: role === "parent",
     isStaff: role === "owner" || role === "admin" || role === "teacher",
   };
 }

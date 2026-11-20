@@ -7,6 +7,7 @@ import {
   CollectFeeModal,
   CreateInvoiceModal,
   PrintableReceiptModal,
+  PaymentHistoryModal,
 } from "../components/fees";
 import { feesService } from "../services/feesService";
 import { useAuth } from "../hooks/useAuth";
@@ -34,6 +35,7 @@ export const Fees: React.FC = () => {
   // Modal States
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [collectRecord, setCollectRecord] = useState<FeeRecord | null>(null);
+  const [historyRecord, setHistoryRecord] = useState<FeeRecord | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
 
   useEffect(() => {
@@ -186,6 +188,7 @@ export const Fees: React.FC = () => {
           onSearchChange={handleSearchChange}
           onCollectPayment={(rec) => setCollectRecord(rec)}
           onViewReceipt={handleViewReceipt}
+          onViewHistory={(rec) => setHistoryRecord(rec)}
           canManageFees={canManageFees}
         />
       )}
@@ -196,6 +199,16 @@ export const Fees: React.FC = () => {
         onClose={() => setCollectRecord(null)}
         record={collectRecord}
         onSuccess={handlePaymentSuccess}
+      />
+
+      <PaymentHistoryModal
+        isOpen={Boolean(historyRecord)}
+        onClose={() => setHistoryRecord(null)}
+        record={historyRecord}
+        onReversalSuccess={() => {
+          setNotice({ type: "success", message: "Fee payment reversed and ledger adjusted." });
+          loadFeesData();
+        }}
       />
 
       <CreateInvoiceModal

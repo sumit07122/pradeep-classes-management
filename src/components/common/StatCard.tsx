@@ -7,7 +7,7 @@ export interface StatCardProps {
   delta?: string;
   note?: string;
   icon: LucideIcon;
-  tone?: "blue" | "violet" | "green" | "amber";
+  tone?: "blue" | "violet" | "green" | "amber" | "rose";
   isDemo?: boolean;
 }
 
@@ -25,6 +25,7 @@ export const StatCard: React.FC<StatCardProps> = ({
     violet: "bg-[#f0edfb] text-[#7965ba]",
     green: "bg-[#e9f6ef] text-[#39946a]",
     amber: "bg-[#fff5e4] text-[#c18a2e]",
+    rose: "bg-rose-50 text-rose-700",
   };
 
   return (

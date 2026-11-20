@@ -29,7 +29,6 @@ export const Topbar: React.FC<TopbarProps> = ({
     admin: "bg-blue-100 text-blue-800 border-blue-300",
     teacher: "bg-emerald-100 text-emerald-800 border-emerald-300",
     student: "bg-purple-100 text-purple-800 border-purple-300",
-    parent: "bg-sky-100 text-sky-800 border-sky-300",
   };
 
   return (

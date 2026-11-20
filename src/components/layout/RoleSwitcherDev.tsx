@@ -21,7 +21,6 @@ export const RoleSwitcherDev: React.FC<RoleSwitcherDevProps> = ({
     { role: "admin", label: "Admin" },
     { role: "teacher", label: "Teacher" },
     { role: "student", label: "Student" },
-    { role: "parent", label: "Parent" },
   ];
 
   return (

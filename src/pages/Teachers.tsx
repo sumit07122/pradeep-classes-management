@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Phone } from "lucide-react";
+import { Plus, Phone, Edit2, CheckCircle2 } from "lucide-react";
 import { teachersService } from "../services/teachersService";
 import {
   Button,
@@ -11,15 +11,16 @@ import {
   LoadingSpinner,
   AlertNotice,
 } from "../components/common";
-import { useAuth } from "../hooks/useAuth";
 import type { Teacher } from "../types";
 
 export const Teachers: React.FC = () => {
-  const { isDemoMode } = useAuth();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [subject, setSubject] = useState("Physics");
@@ -27,44 +28,90 @@ export const Teachers: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const res = await teachersService.getTeachers();
-      setTeachers(res.data);
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const tRes = await teachersService.getTeachers();
+      setTeachers(tRes.data);
+    } catch (err: any) {
+      setErrorNotice(err.message || "Failed to load faculty.");
+    } finally {
       setLoading(false);
     }
-    load();
-  }, []);
+  };
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) return;
 
     setIsSubmitting(true);
+    setErrorNotice(null);
+
     const res = await teachersService.createTeacher({
       full_name: fullName.trim(),
       subject,
       phone: phone.trim(),
-      assigned_batches: ["JEE Morning"],
+      assigned_batches: ["General Subject Batch"],
       is_active: true,
     });
     setIsSubmitting(false);
 
     if (res.error || !res.data) {
-      setNotice("Failed to save teacher record.");
+      setErrorNotice(res.error || "Failed to save teacher record.");
       return;
     }
 
-    setTeachers((prev) => [res.data!, ...prev]);
     setShowModal(false);
     setFullName("");
     setPhone("");
-    setNotice(
-      isDemoMode
-        ? "Faculty added in DEMO mode. Connect Supabase to persist records."
-        : `Teacher ${res.data.full_name} registered successfully.`
-    );
-    window.setTimeout(() => setNotice(null), 5000);
+    setNotice(`Faculty ${res.data.full_name} registered successfully.`);
+    loadData();
+  };
+
+  const openEdit = (t: Teacher) => {
+    setEditingTeacher(t);
+    setFullName(t.full_name);
+    setSubject(t.subject);
+    setPhone(t.phone || "");
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTeacher) return;
+
+    setIsSubmitting(true);
+    setErrorNotice(null);
+
+    const res = await teachersService.updateTeacher(editingTeacher.id, {
+      full_name: fullName.trim(),
+      subject,
+      phone: phone.trim(),
+    });
+
+    setIsSubmitting(false);
+
+    if (res.error) {
+      setErrorNotice(res.error);
+    } else {
+      setNotice(`Updated faculty record for ${fullName}.`);
+      setShowEditModal(false);
+      loadData();
+    }
+  };
+
+  const handleToggleStatus = async (t: Teacher) => {
+    const nextStatus = !t.is_active;
+    const res = await teachersService.toggleTeacherStatus(t.id, nextStatus);
+    if (res.success) {
+      setNotice(`Status for ${t.full_name} set to ${nextStatus ? "Active" : "Inactive"}.`);
+      loadData();
+    } else {
+      setErrorNotice(res.error || "Failed to update status.");
+    }
   };
 
   return (
@@ -72,16 +119,24 @@ export const Teachers: React.FC = () => {
       {notice && (
         <AlertNotice type="success" message={notice} onDismiss={() => setNotice(null)} />
       )}
+      {errorNotice && (
+        <AlertNotice type="error" message={errorNotice} onDismiss={() => setErrorNotice(null)} />
+      )}
 
       <div className="welcome-row">
         <div>
           <div className="eyebrow">FACULTY DIRECTORY</div>
-          <h1>Teaching Team</h1>
-          <p>Manage institute faculty members, subjects, and batch assignments.</p>
+          <h1 className="text-2xl font-extrabold text-[#102f50]">Teaching Team</h1>
+          <p className="text-sm text-slate-500">Manage institute faculty members, subjects, and batch assignments.</p>
         </div>
         <Button
           variant="primary"
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setFullName("");
+            setPhone("");
+            setSubject("Physics");
+            setShowModal(true);
+          }}
           icon={<Plus size={16} />}
         >
           Add teacher
@@ -108,7 +163,7 @@ export const Teachers: React.FC = () => {
         ) : (
           <div className="teacher-grid">
             {teachers.map((t) => (
-              <div className="teacher-card" key={t.id}>
+              <div className="teacher-card relative" key={t.id}>
                 <div className="flex items-start justify-between">
                   <div className="teacher-avatar">
                     {t.full_name
@@ -117,12 +172,20 @@ export const Teachers: React.FC = () => {
                       .slice(0, 2)
                       .join("")}
                   </div>
-                  {isDemoMode && (
-                    <Badge variant="demo" size="sm">
-                      DEMO
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={t.is_active ? "green" : "red"} size="sm">
+                      {t.is_active ? "Active" : "Inactive"}
                     </Badge>
-                  )}
+                    <button
+                      onClick={() => openEdit(t)}
+                      className="p-1 text-slate-400 hover:text-[#16466f] transition"
+                      title="Edit Faculty"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                  </div>
                 </div>
+
                 <h3>{t.full_name}</h3>
                 <p className="font-semibold text-slate-600">{t.subject}</p>
 
@@ -133,9 +196,18 @@ export const Teachers: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="teacher-phone flex items-center gap-1.5 text-slate-500">
-                  <Phone size={13} />
-                  <span>{t.phone || "No phone provided"}</span>
+                <div className="teacher-phone flex items-center justify-between text-slate-500 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <Phone size={13} />
+                    <span>{t.phone || "No phone provided"}</span>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleStatus(t)}
+                    className="text-[11px] font-semibold text-slate-400 hover:text-slate-800 transition"
+                  >
+                    {t.is_active ? "Deactivate" : "Activate"}
+                  </button>
                 </div>
               </div>
             ))}
@@ -148,44 +220,112 @@ export const Teachers: React.FC = () => {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title="Register Faculty Member"
-        subtitle="FACULTY MANAGEMENT"
       >
         <form onSubmit={handleAddTeacher} className="space-y-4">
           <Input
-            label="Teacher Full Name"
+            label="Full name"
             required
             autoFocus
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="e.g. Dr. Ramesh Gupta"
+            placeholder="e.g. Dr. Rajesh Sharma"
           />
 
           <Select
-            label="Subject Specialization"
-            options={["Physics", "Chemistry", "Mathematics", "Biology", "English"]}
+            label="Primary subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            options={[
+              { value: "Physics", label: "Physics" },
+              { value: "Chemistry", label: "Chemistry" },
+              { value: "Mathematics", label: "Mathematics" },
+              { value: "Biology", label: "Biology" },
+              { value: "Foundation Science", label: "Foundation Science" },
+            ]}
           />
 
           <Input
-            label="Mobile Number"
+            label="Phone number"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="10-digit mobile number"
-            maxLength={10}
+            placeholder="+91 98765 43210"
           />
 
-          <div className="flex justify-end gap-2 pt-3">
-            <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+          <div className="modal-actions pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              Save faculty profile
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isSubmitting}
+            >
+              Register Teacher
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Edit Teacher Modal */}
+      {showEditModal && editingTeacher && (
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          title={`Edit Faculty — ${editingTeacher.full_name}`}
+        >
+          <form onSubmit={handleUpdateTeacher} className="space-y-4">
+            <Input
+              label="Full name"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+
+            <Select
+              label="Primary subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              options={[
+                { value: "Physics", label: "Physics" },
+                { value: "Chemistry", label: "Chemistry" },
+                { value: "Mathematics", label: "Mathematics" },
+                { value: "Biology", label: "Biology" },
+                { value: "Foundation Science", label: "Foundation Science" },
+              ]}
+            />
+
+            <Input
+              label="Phone number"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+
+            <div className="modal-actions pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isSubmitting}
+                icon={<CheckCircle2 size={16} />}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };

@@ -15,6 +15,11 @@ import { Batches } from "../pages/Batches";
 import { Attendance } from "../pages/Attendance";
 import { Fees } from "../pages/Fees";
 import { Academics } from "../pages/Academics";
+import { Timetable } from "../pages/Timetable";
+import { HomeworkMaterials } from "../pages/HomeworkMaterials";
+import { Announcements } from "../pages/Announcements";
+import { Reports } from "../pages/Reports";
+import { Settings } from "../pages/Settings";
 import { Portal } from "../pages/Portal";
 
 export const AppRoutes: React.FC = () => {
@@ -40,16 +45,17 @@ export const AppRoutes: React.FC = () => {
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/config-error" element={<ConfigError />} />
 
-      {/* Staff & Admin Routes */}
+      {/* Overview / Dashboard */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
             {wrapWithShell("Overview", <Dashboard />)}
           </ProtectedRoute>
         }
       />
 
+      {/* Students Directory */}
       <Route
         path="/students"
         element={
@@ -59,6 +65,7 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Teachers Directory */}
       <Route
         path="/teachers"
         element={
@@ -68,6 +75,7 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Batches Management */}
       <Route
         path="/batches"
         element={
@@ -77,6 +85,7 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Attendance Roll Call */}
       <Route
         path="/attendance"
         element={
@@ -86,29 +95,81 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Fee Records & Payment Ledger */}
       <Route
         path="/fees"
         element={
           <ProtectedRoute allowedRoles={["owner", "admin"]}>
-            {wrapWithShell("Fees", <Fees />)}
+            {wrapWithShell("Fee Management", <Fees />)}
           </ProtectedRoute>
         }
       />
 
+      {/* Academics & Exams */}
       <Route
         path="/academics"
         element={
           <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
-            {wrapWithShell("Academics", <Academics />)}
+            {wrapWithShell("Exams & Marks", <Academics />)}
           </ProtectedRoute>
         }
       />
 
-      {/* Student & Parent Portal */}
+      {/* Timetable */}
+      <Route
+        path="/timetable"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+            {wrapWithShell("Timetable", <Timetable />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Study Materials & Homework */}
+      <Route
+        path="/materials"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+            {wrapWithShell("Study Materials", <HomeworkMaterials />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Announcements & WhatsApp Queue */}
+      <Route
+        path="/announcements"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+            {wrapWithShell("Announcements", <Announcements />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Reports & Data Export */}
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            {wrapWithShell("Reports & Export", <Reports />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Institute Settings */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            {wrapWithShell("Settings", <Settings />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Student Academic Portal */}
       <Route
         path="/portal"
         element={
-          <ProtectedRoute allowedRoles={["student", "parent", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["student", "owner", "admin"]}>
             {wrapWithShell("Student Portal", <Portal />)}
           </ProtectedRoute>
         }
@@ -118,7 +179,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/"
         element={
-          role === "student" || role === "parent" ? (
+          role === "student" ? (
             <Navigate to="/portal" replace />
           ) : (
             <Navigate to="/dashboard" replace />

@@ -7,354 +7,383 @@ import {
   IndianRupee,
   BookOpen,
   ArrowUpRight,
-  CheckCircle2,
-  Clock3,
   Plus,
+  ShieldAlert,
 } from "lucide-react";
-import { StatCard, Button, EmptyState, LoadingSpinner, Badge } from "../components/common";
-import { studentsService } from "../services/studentsService";
-import { teachersService } from "../services/teachersService";
+import { StatCard, Button, LoadingSpinner, Badge } from "../components/common";
 import { useAuth } from "../hooks/useAuth";
-import type { Student, Teacher } from "../types";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { feesService } from "../services/feesService";
+import { attendanceService } from "../services/attendanceService";
+import type { AttendanceDefaulter } from "../types";
 
 export const Dashboard: React.FC = () => {
-  const { isDemoMode } = useAuth();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const { role, user } = useAuth();
   const [loading, setLoading] = useState(true);
 
+  // Statistics
+  const [studentCount, setStudentCount] = useState<number>(0);
+  const [teacherCount, setTeacherCount] = useState<number>(0);
+  const [batchCount, setBatchCount] = useState<number>(0);
+  const [feeSummary, setFeeSummary] = useState<{
+    total_billed: number;
+    total_collected: number;
+    total_pending: number;
+  }>({ total_billed: 0, total_collected: 0, total_pending: 0 });
+
+  const [todayAttendance, setTodayAttendance] = useState<{
+    present: number;
+    absent: number;
+    late: number;
+    total: number;
+    percentage: number;
+  }>({ present: 0, absent: 0, late: 0, total: 0, percentage: 100 });
+
+  const [defaulters, setDefaulters] = useState<AttendanceDefaulter[]>([]);
+  const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [teacherBatches, setTeacherBatches] = useState<any[]>([]);
+
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const [studentsRes, teachersRes] = await Promise.all([
-        studentsService.getStudents(),
-        teachersService.getTeachers(),
+    loadDashboardMetrics();
+  }, [user, role]);
+
+  const loadDashboardMetrics = async () => {
+    setLoading(true);
+
+    if (!isSupabaseConfigured || !supabase) {
+      setStudentCount(24);
+      setTeacherCount(4);
+      setBatchCount(3);
+      setFeeSummary({ total_billed: 120000, total_collected: 75000, total_pending: 45000 });
+      setTodayAttendance({ present: 22, absent: 2, late: 0, total: 24, percentage: 91.6 });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Fetch live entity counts
+      const [
+        { count: sCount },
+        { count: tCount },
+        { count: bCount },
+        fSummary,
+        defaultersRes,
+      ] = await Promise.all([
+        supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "Active"),
+        supabase.from("teachers").select("id", { count: "exact", head: true }).eq("is_active", true),
+        supabase.from("batches").select("id", { count: "exact", head: true }),
+        feesService.getFeeSummary().catch(() => ({ total_billed: 0, total_collected: 0, total_pending: 0 })),
+        attendanceService.getAttendanceDefaulters(75.0).catch(() => []),
       ]);
-      setStudents(studentsRes.data);
-      setTeachers(teachersRes.data);
+
+      setStudentCount(sCount ?? 0);
+      setTeacherCount(tCount ?? 0);
+      setBatchCount(bCount ?? 0);
+      setFeeSummary({
+        total_billed: fSummary.total_billed,
+        total_collected: fSummary.total_collected,
+        total_pending: fSummary.total_pending,
+      });
+      setDefaulters(defaultersRes.slice(0, 5));
+
+      // 2. Fetch today's real attendance
+      const today = new Date().toISOString().split("T")[0];
+      const { data: todaySessions } = await supabase
+        .from("attendance_sessions")
+        .select(`
+          id,
+          attendance_records ( status )
+        `)
+        .eq("session_date", today);
+
+      if (todaySessions && todaySessions.length > 0) {
+        let p = 0;
+        let a = 0;
+        let l = 0;
+        let tot = 0;
+
+        todaySessions.forEach((sess: any) => {
+          (sess.attendance_records || []).forEach((r: any) => {
+            tot++;
+            if (r.status === "present") p++;
+            else if (r.status === "absent") a++;
+            else if (r.status === "late") l++;
+          });
+        });
+
+        const pct = tot > 0 ? (p / tot) * 100 : 100;
+        setTodayAttendance({ present: p, absent: a, late: l, total: tot, percentage: pct });
+      }
+
+      // 3. Fetch recent payments
+      const { data: payments } = await supabase
+        .from("fee_payments")
+        .select(`
+          id,
+          amount,
+          receipt_no,
+          payment_mode,
+          payment_date,
+          is_reversal,
+          students ( full_name )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      setRecentPayments(payments || []);
+
+      // 4. If Teacher role, load their assigned batches
+      if (role === "teacher" && user?.id) {
+        const { data: tRow } = await supabase
+          .from("teachers")
+          .select("id")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+
+        if (tRow) {
+          const { data: tb } = await supabase
+            .from("teacher_batches")
+            .select("batch_id, batches(id, name, course_name, current_capacity, max_capacity)")
+            .eq("teacher_id", tRow.id);
+
+          setTeacherBatches((tb || []).map((x: any) => x.batches).filter(Boolean));
+        }
+      }
+    } catch (err) {
+      console.error("Error loading dashboard metrics:", err);
+    } finally {
       setLoading(false);
     }
-    loadData();
-  }, []);
+  };
 
   if (loading) {
-    return <LoadingSpinner label="Loading institute analytics..." size="lg" />;
+    return <LoadingSpinner label="Loading real-time institute metrics..." size="lg" />;
   }
 
-  const activeStudentsCount = students.filter((s) => s.status === "Active").length;
+  const isTeacher = role === "teacher";
 
   return (
     <div className="space-y-6">
-      {/* Welcome header */}
+      {/* Top Banner */}
       <div className="welcome-row">
         <div>
-          <div className="eyebrow">INSTITUTE OVERVIEW</div>
-          <h1>Good afternoon, Administrator</h1>
-          <p>Here is what is happening at Pradeep Classes today.</p>
+          <div className="eyebrow">INSTITUTE EXECUTIVE OVERVIEW</div>
+          <h1 className="text-2xl font-extrabold text-[#102f50]">
+            Welcome back, {user?.full_name || "Administrator"}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {isTeacher
+              ? "Here are your assigned batches and student attendance status today."
+              : "Live operations overview for Pradeep Classes Coaching Campus."}
+          </p>
         </div>
+
         <div className="flex gap-2">
-          <Link to="/students">
-            <Button variant="primary" icon={<Plus size={16} />}>
-              Add student
+          {!isTeacher && (
+            <Link to="/students">
+              <Button variant="primary" icon={<Plus size={16} />}>
+                Admit Student
+              </Button>
+            </Link>
+          )}
+          <Link to="/attendance">
+            <Button variant="outline" icon={<ClipboardCheck size={16} />}>
+              Mark Roll Call
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* KPI Cards */}
       <section className="stats-grid">
         <StatCard
-          title="Total Students"
-          value={students.length > 0 ? String(students.length).padStart(2, "0") : "00"}
-          delta="+8.2%"
-          note="enrolled students"
+          title="Active Students"
+          value={String(studentCount).padStart(2, "0")}
+          note="enrolled & attending"
           icon={Users}
           tone="blue"
-          isDemo={isDemoMode}
         />
         <StatCard
-          title="Active Teachers"
-          value={teachers.length > 0 ? String(teachers.length).padStart(2, "0") : "00"}
-          delta="+2"
-          note="faculty members"
+          title="Faculty Members"
+          value={String(teacherCount).padStart(2, "0")}
+          note="active teaching staff"
           icon={GraduationCap}
           tone="violet"
-          isDemo={isDemoMode}
         />
         <StatCard
-          title="Today's Attendance"
-          value={students.length > 0 ? "92%" : "N/A"}
-          delta="+3.4%"
-          note="vs yesterday"
-          icon={ClipboardCheck}
-          tone="green"
-          isDemo={isDemoMode}
-        />
-        <StatCard
-          title="Fee Collection"
-          value={students.length > 0 ? "₹48,500" : "₹0"}
-          delta="+12.5%"
-          note="this month"
-          icon={IndianRupee}
+          title="Active Batches"
+          value={String(batchCount).padStart(2, "0")}
+          note="classroom sections"
+          icon={BookOpen}
           tone="amber"
-          isDemo={isDemoMode}
+        />
+        <StatCard
+          title="Fee Collections"
+          value={`₹${feeSummary.total_collected.toLocaleString()}`}
+          note={`₹${feeSummary.total_pending.toLocaleString()} pending`}
+          icon={IndianRupee}
+          tone="green"
         />
       </section>
 
-      {/* Center Grid: Attendance & Quick Actions */}
-      <div className="content-grid">
-        {/* Attendance Summary */}
-        <section className="panel attendance-panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Daily Attendance Snapshot</h3>
-              <p>Real-time attendance ratio across all batches</p>
-            </div>
-            <Link to="/attendance" className="text-button">
-              View report <ArrowUpRight size={14} />
-            </Link>
-          </div>
-
-          {students.length === 0 ? (
-            <EmptyState
-              title="No attendance marked today"
-              description="Batch attendance records will appear here once teachers submit daily rolls."
-            />
-          ) : (
-            <>
-              <div className="attendance-summary">
-                <div className="attendance-ring">
-                  <div>
-                    <strong>92%</strong>
-                    <small>Present today</small>
-                  </div>
-                </div>
-                <div className="attendance-legend">
-                  <div className="legend-row">
-                    <i className="green" />
-                    <span>Present</span>
-                    <b>184</b>
-                  </div>
-                  <div className="legend-row">
-                    <i className="red" />
-                    <span>Absent</span>
-                    <b>12</b>
-                  </div>
-                  <div className="legend-row">
-                    <i className="amber" />
-                    <span>Late</span>
-                    <b>4</b>
-                  </div>
-                </div>
-              </div>
-              <div className="attendance-foot">
-                <span>
-                  <CheckCircle2 size={15} /> Attendance recorded at 10:30 AM
-                </span>
-                <span>{activeStudentsCount} active students on roll</span>
-              </div>
-            </>
-          )}
-        </section>
-
-        {/* Quick Actions */}
-        <section className="panel activity-panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Quick Actions</h3>
-              <p>Common daily administrative tasks</p>
-            </div>
-          </div>
-          <div className="quick-grid">
-            <Link to="/students" className="quick-action">
-              <div>
-                <Users size={17} />
-              </div>
-              <span>
-                <b>Add Student</b>
-                <small>Enroll a new candidate</small>
-              </span>
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link to="/attendance" className="quick-action">
-              <div>
-                <ClipboardCheck size={17} />
-              </div>
-              <span>
-                <b>Mark Attendance</b>
-                <small>Open batch register</small>
-              </span>
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link to="/fees" className="quick-action">
-              <div>
-                <IndianRupee size={17} />
-              </div>
-              <span>
-                <b>Record Payment</b>
-                <small>Issue student fee receipt</small>
-              </span>
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link to="/batches" className="quick-action">
-              <div>
-                <BookOpen size={17} />
-              </div>
-              <span>
-                <b>Create Batch</b>
-                <small>Add learning classroom</small>
-              </span>
-              <ArrowUpRight size={15} />
-            </Link>
-          </div>
-        </section>
-      </div>
-
-      {/* Recent Students Table */}
-      <section className="panel students-panel">
-        <div className="panel-heading">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Attendance Widget */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <h3>Recently Enrolled Students</h3>
-            <p>Latest admission records for Pradeep Classes</p>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Today's Attendance</h3>
+                <p className="text-xs text-slate-500">Cross-batch real-time presence</p>
+              </div>
+              <Link to="/attendance" className="text-xs font-bold text-[#16466f] hover:underline flex items-center gap-1">
+                Full roll <ArrowUpRight size={13} />
+              </Link>
+            </div>
+
+            <div className="py-6 flex items-center justify-center">
+              <div className="w-28 h-28 rounded-full border-4 border-[#16466f] flex flex-col items-center justify-center text-center shadow-inner">
+                <span className="text-2xl font-black text-[#16466f]">
+                  {todayAttendance.total > 0 ? `${todayAttendance.percentage.toFixed(0)}%` : "N/A"}
+                </span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  {todayAttendance.total > 0 ? "Present" : "No Session"}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-slate-100">
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <span className="text-emerald-700 block font-bold text-sm">{todayAttendance.present}</span>
+                <span className="text-slate-500 text-[11px]">Present</span>
+              </div>
+              <div className="p-2 bg-rose-50 rounded-lg">
+                <span className="text-rose-700 block font-bold text-sm">{todayAttendance.absent}</span>
+                <span className="text-slate-500 text-[11px]">Absent</span>
+              </div>
+              <div className="p-2 bg-amber-50 rounded-lg">
+                <span className="text-amber-700 block font-bold text-sm">{todayAttendance.late}</span>
+                <span className="text-slate-500 text-[11px]">Late</span>
+              </div>
+            </div>
           </div>
-          <Link to="/students" className="text-button">
-            View all records <ArrowUpRight size={14} />
-          </Link>
         </div>
 
-        {students.length === 0 ? (
-          <EmptyState
-            title="No students registered yet"
-            description="Students added to Pradeep Classes will show here with their admission numbers and assigned batches."
-            actionLabel="Add first student"
-            onAction={() => {}}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>STUDENT</th>
-                  <th>ADMISSION NO.</th>
-                  <th>CLASS</th>
-                  <th>BATCH</th>
-                  <th>PHONE</th>
-                  <th>STATUS</th>
-                  {isDemoMode && <th>DATA TYPE</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {students.slice(0, 5).map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <div className="student-cell">
-                        <div className="student-avatar">
-                          {s.full_name
-                            .split(" ")
-                            .map((x) => x[0])
-                            .slice(0, 2)
-                            .join("")}
-                        </div>
-                        <b>{s.full_name}</b>
+        {/* Center / Defaulters Widget */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base flex items-center gap-1.5">
+                  <ShieldAlert size={16} className="text-rose-600" />
+                  Attendance Defaulters
+                </h3>
+                <p className="text-xs text-slate-500">Students with attendance &lt; 75%</p>
+              </div>
+              <Badge variant={defaulters.length > 0 ? "red" : "green"} size="sm">
+                {defaulters.length} Defaulters
+              </Badge>
+            </div>
+
+            <div className="divide-y divide-slate-100 mt-3">
+              {defaulters.length === 0 ? (
+                <div className="py-10 text-center text-xs text-slate-400 italic">
+                  Excellent! All active students maintain compliance above 75%.
+                </div>
+              ) : (
+                defaulters.map((d) => (
+                  <div key={d.student_id} className="py-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <b className="text-slate-800 block">{d.student_name}</b>
+                      <span className="text-slate-400 font-mono text-[11px]">{d.admission_no} • {d.batch_name}</span>
+                    </div>
+                    <Badge variant="red" size="sm">
+                      {d.percentage.toFixed(1)}%
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 text-right">
+            <Link to="/attendance" className="text-xs font-bold text-[#16466f] hover:underline">
+              View Defaulters Report →
+            </Link>
+          </div>
+        </div>
+
+        {/* Right / Recent Transactions or Faculty Batches */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          {isTeacher ? (
+            <div>
+              <div className="pb-3 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800 text-base">Your Assigned Batches</h3>
+                <p className="text-xs text-slate-500">Classes assigned to your timetable</p>
+              </div>
+
+              <div className="divide-y divide-slate-100 mt-3">
+                {teacherBatches.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No batches assigned to your profile yet.
+                  </div>
+                ) : (
+                  teacherBatches.map((b) => (
+                    <div key={b.id} className="py-3 flex items-center justify-between text-xs">
+                      <div>
+                        <b className="text-slate-800 block text-sm">{b.name}</b>
+                        <span className="text-slate-500">{b.course_name}</span>
                       </div>
-                    </td>
-                    <td className="muted-cell">{s.admission_no}</td>
-                    <td>{s.class_name}</td>
-                    <td>{s.batch_name}</td>
-                    <td>{s.phone}</td>
-                    <td>
-                      <Badge
-                        variant={s.status === "Active" ? "success" : "warning"}
-                        size="sm"
-                        showDot
-                      >
-                        {s.status}
+                      <Badge variant="blue" size="sm">
+                        {b.current_capacity || 0} / {b.max_capacity} Seats
                       </Badge>
-                    </td>
-                    {isDemoMode && (
-                      <td>
-                        <Badge variant="demo" size="sm">
-                          DEMO
-                        </Badge>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Bottom Grid: Schedule & Fee Snapshot */}
-      <div className="bottom-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Today's Lecture Schedule</h3>
-              <p>Active batch timetables</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <Link to="/academics" className="text-button">
-              View full timetable <ArrowUpRight size={14} />
+          ) : (
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Recent Collections</h3>
+                  <p className="text-xs text-slate-500">Latest settled fee payments</p>
+                </div>
+                <Link to="/fees" className="text-xs font-bold text-[#16466f] hover:underline flex items-center gap-1">
+                  Ledger <ArrowUpRight size={13} />
+                </Link>
+              </div>
+
+              <div className="divide-y divide-slate-100 mt-3">
+                {recentPayments.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400 italic">
+                    No fee payments recorded recently.
+                  </div>
+                ) : (
+                  recentPayments.map((p) => (
+                    <div key={p.id} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <b className="text-slate-800 block">{(p.students as any)?.full_name || "Student"}</b>
+                        <span className="text-slate-400 font-mono text-[11px]">
+                          {p.receipt_no} • {p.payment_mode?.toUpperCase()}
+                        </span>
+                      </div>
+                      <span className={`font-bold ${p.is_reversal ? "text-rose-600" : "text-emerald-700"}`}>
+                        {p.is_reversal ? "- " : "+ "}₹{Number(p.amount).toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-100 text-right">
+            <Link to={isTeacher ? "/timetable" : "/fees"} className="text-xs font-bold text-[#16466f] hover:underline">
+              {isTeacher ? "Open My Timetable →" : "Open Full Fee Center →"}
             </Link>
           </div>
-          <div className="schedule-list">
-            <div className="schedule-item">
-              <time>08:00 AM</time>
-              <i className="blue" />
-              <div>
-                <b>Physics · JEE Morning</b>
-                <small>Amit Kumar • Room 101</small>
-              </div>
-              <span className="schedule-status font-medium text-emerald-600">Active</span>
-            </div>
-            <div className="schedule-item">
-              <time>10:30 AM</time>
-              <i className="violet" />
-              <div>
-                <b>Chemistry · NEET Evening</b>
-                <small>Neha Sharma • Room 204</small>
-              </div>
-              <span className="schedule-status">Scheduled</span>
-            </div>
-            <div className="schedule-item">
-              <time>04:00 PM</time>
-              <i className="green" />
-              <div>
-                <b>Mathematics · Foundation A</b>
-                <small>Rahul Mishra • Hall A</small>
-              </div>
-              <span className="schedule-status">Scheduled</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel fee-panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Fee Collection Progress</h3>
-              <p>Monthly target vs realized collections</p>
-            </div>
-            <Link to="/fees" className="text-button">
-              Fee Ledger <ArrowUpRight size={14} />
-            </Link>
-          </div>
-          <div className="fee-total">
-            <strong>₹48,500</strong>
-            <span>of ₹65,000 monthly target</span>
-          </div>
-          <div className="progress">
-            <i style={{ width: "74.6%" }} />
-          </div>
-          <div className="fee-meta">
-            <span>74.6% collection completed</span>
-            <b>₹16,500 pending balance</b>
-          </div>
-          <div className="fee-note">
-            <Clock3 size={15} />
-            <span>12 students have pending dues this term</span>
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type {
   AttendanceSession,
   RollCallStudent,
@@ -6,6 +6,7 @@ import type {
   SaveAttendancePayload,
   StudentAttendanceStats,
   BatchDefaulter,
+  AttendanceDefaulter,
   AttendanceStatus,
 } from '../types';
 
@@ -245,6 +246,45 @@ export const attendanceService = {
       note: r.note,
       marked_at: r.marked_at,
     }));
+  },
+
+  /**
+   * Fetches institute-wide attendance defaulters below a given percentage threshold.
+   */
+  async getAttendanceDefaulters(threshold = 75.0): Promise<AttendanceDefaulter[]> {
+    if (!isSupabaseConfigured || !supabase) {
+      return [
+        {
+          student_id: 'demo-s3',
+          student_name: 'Rohan Singh',
+          admission_no: 'PC-2026-0003',
+          batch_name: 'Foundation 10th',
+          percentage: 68.5,
+          is_defaulter: true,
+        },
+      ];
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_institute_attendance_defaulters', {
+        p_threshold: threshold,
+      });
+
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        student_id: row.student_id,
+        student_name: row.full_name,
+        admission_no: row.admission_no,
+        batch_name: row.batch_name,
+        attended_sessions: row.attended_sessions,
+        total_sessions: row.total_sessions,
+        percentage: Number(row.attendance_percentage) || 0,
+        is_defaulter: true,
+      }));
+    } catch (err: any) {
+      console.warn('Failed to load institute attendance defaulters RPC:', err);
+      return [];
+    }
   },
 
   /**
