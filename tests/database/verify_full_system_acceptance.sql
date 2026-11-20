@@ -67,8 +67,8 @@ BEGIN
     INSERT INTO public.teacher_batches (teacher_id, batch_id)
     VALUES (v_teacher_id, v_batch_id);
 
-    INSERT INTO public.students (full_name, batch_id, phone, institute_id, status)
-    VALUES ('Test Student Alpha', v_batch_id, '+91 99999 22222', v_institute_id, 'Active')
+    INSERT INTO public.students (full_name, class_name, batch_id, phone, institute_id, status)
+    VALUES ('Test Student Alpha', 'Class 12 - Science', v_batch_id, '+91 99999 22222', v_institute_id, 'active')
     RETURNING id INTO v_student_id;
 
     -- ------------------------------------------------------------------------
@@ -111,7 +111,7 @@ BEGIN
 
     SELECT count(*) INTO v_queue_count 
     FROM public.whatsapp_message_queue
-    WHERE student_id = v_student_id AND message_type = 'present';
+    WHERE student_id = v_student_id AND event_type = 'attendance_present';
 
     IF (v_attendance_res->>'success')::boolean = true AND v_queue_count = 1 THEN
         INSERT INTO test_results VALUES (

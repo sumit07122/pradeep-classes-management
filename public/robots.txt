@@ -1,0 +1,4 @@
+# Pradeep Classes Internal Management Portal
+# Private system - search indexing strictly disallowed
+User-agent: *
+Disallow: /

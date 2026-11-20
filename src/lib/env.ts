@@ -5,6 +5,11 @@ const DEFAULT_SUPABASE_ANON_KEY =
 export const env = {
   supabaseUrl: (import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim(),
   supabaseAnonKey: (import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY).trim(),
+  appUrl: (
+    import.meta.env.VITE_APP_URL ||
+    (import.meta.env.PROD ? "https://app.pradeepclasses.in" : "http://localhost:5173")
+  ).trim(),
+  instituteWebsite: "https://pradeepclasses.in",
   isDev: Boolean(import.meta.env.DEV),
   isProd: Boolean(import.meta.env.PROD),
   mode: import.meta.env.MODE || "development",

@@ -107,6 +107,8 @@ export const Announcements: React.FC = () => {
     }
   };
 
+  const [isDispatching, setIsDispatching] = useState(false);
+
   const handleRetryMessage = async (msgId: string) => {
     setIsRetryingId(msgId);
     const res = await whatsappService.retryMessage(msgId);
@@ -116,6 +118,18 @@ export const Announcements: React.FC = () => {
       loadData();
     } else {
       setErrorNotice(res.error || "Retry failed.");
+    }
+  };
+
+  const handleDispatchQueue = async () => {
+    setIsDispatching(true);
+    const res = await whatsappService.dispatchQueue();
+    setIsDispatching(false);
+    if (res.error) {
+      setErrorNotice(res.error);
+    } else {
+      setSuccessNotice(`WhatsApp queue processed (${res.processed} notifications dispatched).`);
+      loadData();
     }
   };
 
@@ -135,13 +149,25 @@ export const Announcements: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {activeTab === "whatsapp_queue" && (
-            <Button
-              variant="outline"
-              icon={<RefreshCw size={15} />}
-              onClick={loadData}
-            >
-              Refresh Queue
-            </Button>
+            <>
+              {canBroadcast && (
+                <Button
+                  variant="primary"
+                  icon={<Send size={15} />}
+                  isLoading={isDispatching}
+                  onClick={handleDispatchQueue}
+                >
+                  Dispatch Pending Queue
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                icon={<RefreshCw size={15} />}
+                onClick={loadData}
+              >
+                Refresh Queue
+              </Button>
+            </>
           )}
 
           {canBroadcast && activeTab === "broadcasts" && (

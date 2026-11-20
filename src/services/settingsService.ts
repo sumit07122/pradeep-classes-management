@@ -106,16 +106,23 @@ export const settingsService = {
         data: {
           id: "demo-whatsapp-settings",
           institute_id: DEFAULT_INSTITUTE_ID,
-          is_enabled: true,
-          phone_number_id: "demo-phone-id",
-          waba_id: "demo-waba-id",
-          access_token: "demo-token",
+          is_enabled: false,
+          phone_number_id: "",
+          waba_id: "",
+          business_account_id: "",
+          access_token: "",
+          api_token: "",
           test_mode: true,
           verified_number: "+91 98765 43210",
+          sender_phone_number: "+91 98765 43210",
           send_present_alert: true,
+          notify_on_present: true,
           send_absent_alert: true,
+          notify_on_absent: true,
           send_late_alert: true,
+          notify_on_late: true,
           send_leave_alert: true,
+          notify_on_leave: true,
           send_fee_receipt_alert: true,
           send_exam_result_alert: true,
           created_at: new Date().toISOString(),
@@ -131,7 +138,39 @@ export const settingsService = {
         .maybeSingle();
 
       if (error) throw error;
-      return { data: data as WhatsAppSettings | null };
+      if (!data) return { data: null };
+
+      const formatted: WhatsAppSettings = {
+        id: data.id,
+        institute_id: data.institute_id,
+        is_enabled: Boolean(data.is_enabled),
+        phone_number_id: data.phone_number_id,
+        waba_id: data.business_account_id,
+        business_account_id: data.business_account_id,
+        access_token: data.api_token,
+        api_token: data.api_token,
+        test_mode: !data.is_enabled || !data.api_token,
+        verified_number: data.sender_phone_number,
+        sender_phone_number: data.sender_phone_number,
+        send_present_alert: data.notify_on_present ?? true,
+        notify_on_present: data.notify_on_present ?? true,
+        send_absent_alert: data.notify_on_absent ?? true,
+        notify_on_absent: data.notify_on_absent ?? true,
+        send_late_alert: data.notify_on_late ?? true,
+        notify_on_late: data.notify_on_late ?? true,
+        send_leave_alert: data.notify_on_leave ?? true,
+        notify_on_leave: data.notify_on_leave ?? true,
+        send_fee_receipt_alert: true,
+        send_exam_result_alert: true,
+        template_present: data.template_present,
+        template_absent: data.template_absent,
+        template_late: data.template_late,
+        template_leave: data.template_leave,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      return { data: formatted };
     } catch (err: any) {
       return { data: null, error: err.message };
     }
@@ -167,22 +206,55 @@ export const settingsService = {
     }
 
     try {
-      // Upsert into whatsapp_settings for default institute
+      const dbPayload = {
+        institute_id: DEFAULT_INSTITUTE_ID,
+        is_enabled: updates.is_enabled ?? false,
+        phone_number_id: (updates.phone_number_id || "").trim() || null,
+        business_account_id: (updates.business_account_id || updates.waba_id || "").trim() || null,
+        api_token: (updates.api_token || updates.access_token || "").trim() || null,
+        sender_phone_number: (updates.sender_phone_number || updates.verified_number || "").trim() || null,
+        notify_on_present: updates.notify_on_present ?? updates.send_present_alert ?? true,
+        notify_on_absent: updates.notify_on_absent ?? updates.send_absent_alert ?? true,
+        notify_on_late: updates.notify_on_late ?? updates.send_late_alert ?? true,
+        notify_on_leave: updates.notify_on_leave ?? updates.send_leave_alert ?? true,
+        updated_at: new Date().toISOString(),
+      };
+
       const { data, error } = await supabase
         .from("whatsapp_settings")
-        .upsert(
-          {
-            institute_id: DEFAULT_INSTITUTE_ID,
-            ...updates,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "institute_id" }
-        )
+        .upsert(dbPayload, { onConflict: "institute_id" })
         .select()
         .single();
 
       if (error) throw error;
-      return { data: data as WhatsAppSettings };
+
+      const formatted: WhatsAppSettings = {
+        id: data.id,
+        institute_id: data.institute_id,
+        is_enabled: Boolean(data.is_enabled),
+        phone_number_id: data.phone_number_id,
+        waba_id: data.business_account_id,
+        business_account_id: data.business_account_id,
+        access_token: data.api_token,
+        api_token: data.api_token,
+        test_mode: !data.is_enabled || !data.api_token,
+        verified_number: data.sender_phone_number,
+        sender_phone_number: data.sender_phone_number,
+        send_present_alert: data.notify_on_present,
+        notify_on_present: data.notify_on_present,
+        send_absent_alert: data.notify_on_absent,
+        notify_on_absent: data.notify_on_absent,
+        send_late_alert: data.notify_on_late,
+        notify_on_late: data.notify_on_late,
+        send_leave_alert: data.notify_on_leave,
+        notify_on_leave: data.notify_on_leave,
+        send_fee_receipt_alert: true,
+        send_exam_result_alert: true,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      return { data: formatted };
     } catch (err: any) {
       return { data: null, error: err.message };
     }
