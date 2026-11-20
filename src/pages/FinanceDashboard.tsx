@@ -6,12 +6,15 @@ import {
   RefreshCw, 
   ArrowUpRight, 
   ArrowDownRight,
-  TrendingUp
+  TrendingUp,
+  PlusCircle
 } from "lucide-react";
 import { Button } from "../components/common";
 import { FinancialSummaryCards } from "../components/finance/FinancialSummaryCards";
 import { CashFlowChart } from "../components/finance/CashFlowChart";
 import { ExpenseCategoryPie } from "../components/finance/ExpenseCategoryPie";
+import { IncomeModal } from "../components/finance/IncomeModal";
+import { ExpenseModal } from "../components/finance/ExpenseModal";
 import { getFinancialDashboard, getIncomes, getExpenses } from "../services/financeService";
 import type { FinancialDashboardSummary, InstituteIncome, InstituteExpense } from "../types/finance";
 
@@ -22,13 +25,21 @@ export const FinanceDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "incomes" | "expenses">("all");
+  
+  // Date range filter
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  // Modals
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
       setError(null);
       const [dashSummary, incomes, expenses] = await Promise.all([
-        getFinancialDashboard(),
+        getFinancialDashboard(startDate || undefined, endDate || undefined),
         getIncomes(),
         getExpenses(),
       ]);
@@ -45,7 +56,7 @@ export const FinanceDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [startDate, endDate]);
 
   return (
     <div className="space-y-6 pb-12 font-['Inter']">
@@ -66,6 +77,35 @@ export const FinanceDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+            <span className="text-[11px] font-semibold text-slate-400">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-transparent text-xs text-slate-700 focus:outline-none font-mono"
+            />
+            <span className="text-[11px] font-semibold text-slate-400 ml-1">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-transparent text-xs text-slate-700 focus:outline-none font-mono"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="text-[10px] text-slate-400 hover:text-slate-700 font-bold ml-1"
+                title="Clear date filter"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -75,6 +115,26 @@ export const FinanceDashboard: React.FC = () => {
           >
             <RefreshCw size={14} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsIncomeModalOpen(true)}
+            className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+          >
+            <PlusCircle size={14} className="mr-1.5 text-emerald-600" />
+            Record Income
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExpenseModalOpen(true)}
+            className="text-xs text-rose-700 border-rose-300 hover:bg-rose-50"
+          >
+            <PlusCircle size={14} className="mr-1.5 text-rose-600" />
+            Record Expense
           </Button>
 
           <Link to="/finance/expenses">
@@ -236,6 +296,19 @@ export const FinanceDashboard: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Action Modals */}
+      <IncomeModal
+        isOpen={isIncomeModalOpen}
+        onClose={() => setIsIncomeModalOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        onSuccess={loadData}
+      />
     </div>
   );
 };

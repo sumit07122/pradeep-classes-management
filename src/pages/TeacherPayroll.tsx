@@ -3,13 +3,14 @@ import {
   Briefcase, 
   Settings, 
   RefreshCw, 
-  FileText 
+  FileText,
+  Sparkles
 } from "lucide-react";
 import { Button } from "../components/common";
 import { SalaryConfigModal } from "../components/finance/SalaryConfigModal";
 import { DisbursePayrollModal } from "../components/finance/DisbursePayrollModal";
 import { SalarySlipModal } from "../components/finance/SalarySlipModal";
-import { getTeacherSalaryConfigs, getTeacherPayrolls } from "../services/financeService";
+import { getTeacherSalaryConfigs, getTeacherPayrolls, generateMonthlyPayroll } from "../services/financeService";
 import type { TeacherSalaryConfig, TeacherPayroll as TeacherPayrollRecord } from "../types/finance";
 
 export const TeacherPayroll: React.FC = () => {
@@ -26,6 +27,24 @@ export const TeacherPayroll: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<TeacherSalaryConfig | null>(null);
   const [disbursingPayroll, setDisbursingPayroll] = useState<TeacherPayrollRecord | null>(null);
   const [slipPayroll, setSlipPayroll] = useState<TeacherPayrollRecord | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleGeneratePayroll = async () => {
+    try {
+      setIsGenerating(true);
+      setError(null);
+      setSuccessMessage(null);
+      const res = await generateMonthlyPayroll(selectedMonth);
+      setSuccessMessage(`Processed payroll generation for ${selectedMonth} (${res.generated_count} new sheets created).`);
+      await fetchData();
+    } catch (err: any) {
+      console.error("Error generating payroll:", err);
+      setError(err.message || "Failed to generate monthly payroll sheets");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -84,6 +103,17 @@ export const TeacherPayroll: React.FC = () => {
           />
 
           <Button
+            variant="primary"
+            size="sm"
+            onClick={handleGeneratePayroll}
+            isLoading={isGenerating}
+            className="text-xs bg-[#102f50] hover:bg-[#16466f] text-white"
+          >
+            <Sparkles size={13} className="mr-1.5 text-amber-400" />
+            Generate Sheets
+          </Button>
+
+          <Button
             variant="outline"
             size="sm"
             onClick={fetchData}
@@ -95,6 +125,18 @@ export const TeacherPayroll: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {successMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
+          <span>{successMessage}</span>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="text-emerald-600 hover:text-emerald-900 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
@@ -251,8 +293,20 @@ export const TeacherPayroll: React.FC = () => {
 
                 {payrolls.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-10 text-center text-slate-400">
-                      No payroll records generated for {selectedMonth}.
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-xs text-slate-500">No payroll records generated for {selectedMonth}.</p>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleGeneratePayroll}
+                          isLoading={isGenerating}
+                          className="text-xs bg-[#102f50] hover:bg-[#16466f] text-white mt-1"
+                        >
+                          <Sparkles size={13} className="mr-1.5 text-amber-400" />
+                          Generate Payroll Sheets for {selectedMonth}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 )}

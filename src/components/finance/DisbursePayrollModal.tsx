@@ -27,6 +27,7 @@ export const DisbursePayrollModal: React.FC<DisbursePayrollModalProps> = ({
 
   const handleDisburse = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     try {
       setIsSubmitting(true);

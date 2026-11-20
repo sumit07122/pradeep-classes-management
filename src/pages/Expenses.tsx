@@ -10,7 +10,7 @@ import {
 import { Button } from "../components/common";
 import { ExpenseModal } from "../components/finance/ExpenseModal";
 import { ExpenseReversalModal } from "../components/finance/ExpenseReversalModal";
-import { getExpenses } from "../services/financeService";
+import { getExpenses, getExpenseReceiptSignedUrl } from "../services/financeService";
 import type { InstituteExpense } from "../types/finance";
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -38,6 +38,15 @@ export const Expenses: React.FC = () => {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [reversalTarget, setReversalTarget] = useState<InstituteExpense | null>(null);
+
+  const handleViewReceipt = async (url: string) => {
+    try {
+      const signed = await getExpenseReceiptSignedUrl(url);
+      window.open(signed, "_blank", "noopener,noreferrer");
+    } catch {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -227,16 +236,15 @@ export const Expenses: React.FC = () => {
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     {exp.receipt_url ? (
-                      <a
-                        href={exp.receipt_url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => handleViewReceipt(exp.receipt_url!)}
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
                       >
                         <FileText size={13} />
                         View
                         <ExternalLink size={10} />
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-slate-400 text-[11px]">—</span>
                     )}
@@ -257,13 +265,22 @@ export const Expenses: React.FC = () => {
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
                     {exp.status === "approved" ? (
-                      <button
-                        onClick={() => setReversalTarget(exp)}
-                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline"
-                        title="Reverse transaction"
-                      >
-                        Reverse
-                      </button>
+                      exp.category === "teacher_payroll" ? (
+                        <span
+                          className="text-[10px] font-semibold text-slate-400 cursor-help"
+                          title="Faculty salary disbursements are managed through the Teacher Payroll sheet"
+                        >
+                          Payroll Linked
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setReversalTarget(exp)}
+                          className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline"
+                          title="Reverse transaction"
+                        >
+                          Reverse
+                        </button>
+                      )
                     ) : (
                       <span
                         className="text-[10px] text-slate-400 cursor-help"

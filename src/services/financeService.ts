@@ -163,6 +163,33 @@ export async function uploadExpenseReceipt(file: File): Promise<string> {
 }
 
 /**
+ * Generate a secure time-limited signed URL for viewing an expense receipt
+ */
+export async function getExpenseReceiptSignedUrl(receiptUrl: string): Promise<string> {
+  if (!receiptUrl) return "";
+  if (receiptUrl.startsWith("blob:") || receiptUrl.startsWith("data:")) return receiptUrl;
+
+  try {
+    const supabase = getSupabase();
+    let path = receiptUrl;
+    if (path.includes("expense-receipts/")) {
+      path = path.split("expense-receipts/")[1];
+    }
+    const { data, error } = await supabase.storage
+      .from("expense-receipts")
+      .createSignedUrl(path, 3600);
+
+    if (error || !data?.signedUrl) {
+      return receiptUrl;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.error("Failed to generate signed receipt URL:", err);
+    return receiptUrl;
+  }
+}
+
+/**
  * Record a new institute expense
  */
 export async function createExpense(
@@ -309,6 +336,29 @@ export async function getTeacherPayrolls(
     teacher_name: row.teachers?.full_name || "Faculty Member",
     teacher_subject: row.teachers?.subject || "Academics",
   }));
+}
+
+/**
+ * Automatically generate pending monthly payroll sheets for active faculty
+ */
+export async function generateMonthlyPayroll(
+  month: string
+): Promise<{ success: boolean; generated_count: number }> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc(
+    "generate_monthly_teacher_payrolls",
+    { p_month: month }
+  );
+
+  if (error) {
+    console.error("Error generating monthly payroll:", error);
+    throw new Error(error.message || "Failed to generate monthly payroll sheets");
+  }
+
+  return {
+    success: data?.success || false,
+    generated_count: data?.generated_count || 0,
+  };
 }
 
 /**
