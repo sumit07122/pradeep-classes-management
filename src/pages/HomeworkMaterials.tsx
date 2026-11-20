@@ -42,6 +42,7 @@ export const HomeworkMaterials: React.FC = () => {
   const [homeworkForm, setHomeworkForm] = useState({
     batch_id: "",
     title: "",
+    subject: "Physics",
     description: "",
     due_date: new Date(Date.now() + 86400000 * 3).toISOString().split("T")[0],
     max_marks: 20,
@@ -123,6 +124,7 @@ export const HomeworkMaterials: React.FC = () => {
     const res = await materialsService.createHomework({
       batch_id: homeworkForm.batch_id,
       title: homeworkForm.title,
+      subject: homeworkForm.subject || "General",
       description: homeworkForm.description || null,
       due_date: homeworkForm.due_date,
       max_marks: Number(homeworkForm.max_marks) || null,
@@ -450,13 +452,23 @@ export const HomeworkMaterials: React.FC = () => {
               onChange={(e) => setHomeworkForm({ ...homeworkForm, batch_id: e.target.value })}
             />
 
-            <Input
-              label="Assignment Title"
-              required
-              placeholder="e.g. Exercise 7.2 - Integration By Parts"
-              value={homeworkForm.title}
-              onChange={(e) => setHomeworkForm({ ...homeworkForm, title: e.target.value })}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Assignment Title"
+                required
+                placeholder="e.g. Exercise 7.2"
+                value={homeworkForm.title}
+                onChange={(e) => setHomeworkForm({ ...homeworkForm, title: e.target.value })}
+              />
+
+              <Input
+                label="Subject"
+                required
+                placeholder="e.g. Physics"
+                value={homeworkForm.subject}
+                onChange={(e) => setHomeworkForm({ ...homeworkForm, subject: e.target.value })}
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Input

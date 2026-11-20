@@ -69,7 +69,7 @@ export const Dashboard: React.FC = () => {
         fSummary,
         defaultersRes,
       ] = await Promise.all([
-        supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "Active"),
+        supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("teachers").select("id", { count: "exact", head: true }).eq("is_active", true),
         supabase.from("batches").select("id", { count: "exact", head: true }),
         feesService.getFeeSummary().catch(() => ({ total_billed: 0, total_collected: 0, total_pending: 0 })),
@@ -143,7 +143,7 @@ export const Dashboard: React.FC = () => {
         if (tRow) {
           const { data: tb } = await supabase
             .from("teacher_batches")
-            .select("batch_id, batches(id, name, course_name, current_capacity, max_capacity)")
+            .select("batch_id, batches(id, name, course_name, max_capacity, timing, room_number)")
             .eq("teacher_id", tRow.id);
 
           setTeacherBatches((tb || []).map((x: any) => x.batches).filter(Boolean));
@@ -335,7 +335,7 @@ export const Dashboard: React.FC = () => {
                         <span className="text-slate-500">{b.course_name}</span>
                       </div>
                       <Badge variant="blue" size="sm">
-                        {b.current_capacity || 0} / {b.max_capacity} Seats
+                        {b.max_capacity} Seats Capacity
                       </Badge>
                     </div>
                   ))

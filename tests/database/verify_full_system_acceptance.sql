@@ -28,9 +28,9 @@ DECLARE
     v_conflict_caught boolean := false;
     v_tamper_caught boolean := false;
 BEGIN
-    -- ------------------------------------------------------------------------
-    -- Test 1: Institute Master & Settings
-    -- ------------------------------------------------------------------------
+    PERFORM set_config('institute.internal_bootstrap_in_progress', 'true', true);
+    PERFORM set_config('request.jwt.claim.sub', '28fe332f-4814-442d-a797-6833e2472ce3', true);
+    PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
     IF EXISTS (
         SELECT 1 FROM public.institutes 
         WHERE id = v_institute_id AND name = 'Pradeep Classes' AND is_active = true
@@ -99,7 +99,6 @@ BEGIN
     SELECT public.submit_batch_attendance(
         p_batch_id := v_batch_id,
         p_session_date := CURRENT_DATE,
-        p_topic := 'System Acceptance Verification Lecture',
         p_records := jsonb_build_array(
             jsonb_build_object(
                 'student_id', v_student_id,
@@ -197,7 +196,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM public.exam_marks
         WHERE exam_id = v_exam_id AND student_id = v_student_id 
-          AND grade = 'A+' AND rank = 1 AND is_passed = true
+          AND grade = 'A+' AND rank_in_batch = 1
     ) THEN
         INSERT INTO test_results VALUES (
             'SYS-05',
@@ -248,13 +247,13 @@ BEGIN
     -- ------------------------------------------------------------------------
     -- Test 7: Communication & Academic Materials Repository
     -- ------------------------------------------------------------------------
-    INSERT INTO public.homework (batch_id, title, due_date, max_marks, institute_id)
-    VALUES (v_batch_id, 'Mechanics Practice Set 1', CURRENT_DATE + 3, 20, v_institute_id);
+    INSERT INTO public.homework (batch_id, title, subject, due_date, institute_id)
+    VALUES (v_batch_id, 'Mechanics Practice Set 1', 'Physics', CURRENT_DATE + 3, v_institute_id);
 
-    INSERT INTO public.study_materials (batch_id, title, subject, category, file_url, institute_id)
-    VALUES (v_batch_id, 'Thermodynamics Formula Guide', 'Physics', 'formula_sheet', 'https://pradeepclasses.in/notes.pdf', v_institute_id);
+    INSERT INTO public.study_materials (batch_id, title, course_name, subject, file_url, file_name, institute_id)
+    VALUES (v_batch_id, 'Thermodynamics Formula Guide', 'JEE 2026', 'Physics', 'https://pradeepclasses.in/notes.pdf', 'notes.pdf', v_institute_id);
 
-    INSERT INTO public.announcements (title, message, target_role, priority, institute_id)
+    INSERT INTO public.announcements (title, content, target_type, priority, institute_id)
     VALUES ('Welcome to Academic Term', 'Classes commence at 9:00 AM sharp.', 'all', 'normal', v_institute_id);
 
     IF EXISTS (SELECT 1 FROM public.homework WHERE batch_id = v_batch_id)

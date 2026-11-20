@@ -157,12 +157,12 @@ export const materialsService = {
         .insert({
           institute_id: instId,
           batch_id: mat.batch_id || null,
-          course_name: mat.course_name,
-          subject: mat.subject,
+          course_name: mat.course_name?.trim() || "JEE / NEET",
+          subject: mat.subject || "General",
           title: mat.title.trim(),
           description: mat.description?.trim() || null,
           file_url: mat.file_url,
-          file_name: mat.file_name,
+          file_name: mat.file_name?.trim() || `${mat.title.trim().toLowerCase().replace(/\s+/g, "-")}.pdf`,
           file_size_kb: mat.file_size_kb || null,
           uploaded_by: profile.user?.id,
         })
