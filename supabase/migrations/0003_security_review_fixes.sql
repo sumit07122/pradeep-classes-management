@@ -48,11 +48,6 @@ drop policy if exists "attendance_records_teacher_read" on public.attendance_rec
 drop policy if exists "attendance_records_teacher_insert" on public.attendance_records;
 drop policy if exists "attendance_records_parent_read" on public.attendance_records;
 
--- Parent-Student Links
-drop policy if exists "parent_students_admin_all" on public.parent_students;
-drop policy if exists "parent_students_parent_read" on public.parent_students;
-drop policy if exists "parent_students_student_read" on public.parent_students;
-
 -- Fee Records & Structures
 drop policy if exists "fee_structures_staff_read" on public.fee_structures;
 drop policy if exists "fee_structures_read" on public.fee_structures;
@@ -354,6 +349,10 @@ create trigger trg_validate_attendance_record
 -- ----------------------------------------------------------------------------
 -- 7. SCOPED POLICIES: Parent-Student Relationships
 -- ----------------------------------------------------------------------------
+
+drop policy if exists "parent_students_admin_all" on public.parent_students;
+drop policy if exists "parent_students_parent_read" on public.parent_students;
+drop policy if exists "parent_students_student_read" on public.parent_students;
 
 -- Owner & Admin: full management
 create policy "parent_students_admin_all" on public.parent_students

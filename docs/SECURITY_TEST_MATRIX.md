@@ -9,11 +9,11 @@ This matrix documents the verification specifications for PostgreSQL Row Level S
 | Test Category | Target Environment | Execution Tool | Current Status |
 |---|---|---|---|
 | **Frontend Type Checking** | Local Workstation | `npx tsc --noEmit` | **VERIFIED & PASSING (0 errors)** |
-| **Production App Bundle** | Local Workstation | `npm run build` | **VERIFIED & PASSING (5.05s)** |
-| **Local Database Execution** | Local PostgreSQL Daemon | `psql` / Supabase CLI | **NOT APPLICABLE** (No local PostgreSQL / Docker engine installed) |
-| **Database RLS & Trigger Suite** | Live Supabase / PostgreSQL 15+ | Supabase SQL Editor | **READY & PENDING LIVE EXECUTION** |
+| **Production App Bundle** | Local Workstation | `npm run build` | **VERIFIED & PASSING (5.95s)** |
+| **Local Database Execution** | Local PostgreSQL Daemon | `psql` / Supabase CLI | **NOT APPLICABLE** (Hosted Cloud DB used) |
+| **Database RLS & Trigger Suite** | Live Supabase (`gajibrwnccddnrbnhwmh`) | Supabase CLI (`supabase db query`) | **VERIFIED & PASSING (12 of 12 assertions passed)** |
 
-*Note: In accordance with verification standards, database assertions are labeled PENDING until physically executed against a live Supabase instance with migrations 0001, 0002, and 0003 applied.*
+*Execution timestamp: 2026-11-20. All 12 security assertions executed inside a self-rolling-back transaction against PostgreSQL 17 on project `pradeep-classes-management` with 0 failures.*
 
 ---
 
