@@ -1,45 +1,81 @@
 # Pradeep Classes Management System
 
-A dedicated institute-management web application starter for Pradeep Classes. The public institute website remains separate; deploy this app to `app.pradeepclasses.in`.
+A production-grade, secure, responsive institute management application for Pradeep Classes, designed for standalone institute operations with multi-tenant SaaS extensibility.
 
-## Stack
-- React + TypeScript + Vite
-- Tailwind CSS + custom responsive academic dashboard UI
-- Supabase (Postgres + Auth) integration foundation
-- PWA and production hardening are planned for the deployment milestone
+---
 
-## Current milestone
-- Responsive admin dashboard
-- Student directory, search and add-student flow
-- Teacher directory and batch overview
-- Supabase client setup via environment variables
-- Initial database schema and row-level-security policies
+## Technology Stack
 
-**Demo mode:** Without Supabase environment variables, the interface uses sample records in browser memory. These are not real institute records and are not saved permanently. Configure Supabase before using the system with actual students.
+- **Frontend**: React 18, TypeScript 5.7, Vite 6, Tailwind CSS 3.4
+- **Routing & State**: React Router 7, AuthContext with Supabase Session Persistence
+- **Backend & Database**: Supabase (PostgreSQL 15+, Auth, Row Level Security)
+- **Deployment**: Vercel ready (app subdomain deployment: `app.pradeepclasses.in`)
 
-## Local setup
-1. Install Node.js 20 or later.
-2. Run `npm install`.
-3. Copy `.env.example` to `.env.local`.
-4. Add your Supabase project URL and anon/public key.
-5. Run `npm run dev`.
+---
 
-## Supabase setup
-1. Create a Supabase project.
-2. Open SQL Editor and run `supabase/migrations/0001_initial_schema.sql`.
-3. Create the first owner profile securely. Do not allow public sign-up to choose their own role. Assign the initial owner role from the Supabase SQL editor after creating the auth user.
-4. Add environment variables to Vercel.
+## Milestone 1 Implementation Highlights
 
-Example owner profile assignment (replace the UUID with the auth user's ID):
-```sql
-insert into public.profiles (id, full_name, role)
-values ('AUTH-USER-UUID', 'Institute Owner', 'owner');
+### 1. Modular Architecture
+- `src/components/common/`: Reusable UI primitives (`Button`, `Input`, `Select`, `Modal`, `Badge`, `StatCard`, `EmptyState`, `LoadingSpinner`, `AlertNotice`, `DemoBanner`).
+- `src/components/layout/`: Responsive academic layout shell (`AppShell`, `Sidebar`, `Topbar`, `RoleSwitcherDev`).
+- `src/context/`: `AuthContext` with Supabase session management, auth listeners, and dev preview mode.
+- `src/services/`: Decoupled data layer (`authService`, `studentsService`, `teachersService`, `batchesService`).
+- `src/routes/`: Declarative protected routes with client-side role guards (`ProtectedRoute`).
+
+### 2. Role-Based Access Control (RBAC)
+Supports 5 distinct roles:
+- **Owner**: Full administrative and financial control.
+- **Admin**: Student, teacher, and batch management.
+- **Teacher**: Batch-scoped attendance marking and academic materials.
+- **Student**: Self-service portal for attendance, timetables, and results.
+- **Parent**: Guardian view for attendance logs and fee receipts.
+
+### 3. Production Security Guarantees
+- **No Self-Privilege Escalation**: Frontend registration defaults to safe unprivileged roles (`student`). PostgreSQL triggers prevent role alteration by non-owners.
+- **Server-Side Authorization**: Supabase Row Level Security (RLS) policies enforce database-level access control.
+- **Dev Role Switcher Isolation**: The dev role preview pill is strictly conditioned on `import.meta.env.DEV` and completely omitted in production builds.
+- **Honest Data Transparency**: When operating without Supabase in development, records are explicitly badged `[DEMO]`. When running in production without Supabase, a dedicated `ConfigError` page is displayed.
+
+---
+
+## Local Setup
+
+1. **Install Dependencies**:
+```bash
+npm install
 ```
 
-## Important security notes
-- Never place the Supabase `service_role` key in frontend code or `VITE_` variables.
-- The initial RLS policies are a foundation, not a completed production security review. Teacher-to-assigned-batch scoping, student/parent self-access, fee privacy, invitation flows and audit triggers must be completed before real-world use.
-- Do not import real student information until authentication and policies have been tested.
+2. **Configure Environment Variables**:
+Copy `.env.example` to `.env.local` and configure your Supabase project:
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_ENABLE_DEV_ROLE_SWITCH=true
+```
 
-## Deployment
-Import the GitHub repository into Vercel, set the framework to Vite, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then add `app.pradeepclasses.in` as a Vercel domain. Only configure the `app` subdomain DNS record; do not change the existing apex/root website records.
+3. **Run Development Server**:
+```bash
+npm run dev
+```
+
+4. **Run Production Build Verification**:
+```bash
+npm run build
+```
+
+---
+
+## Database Migrations & Owner Bootstrap
+
+1. Open your Supabase Project SQL Editor.
+2. Run `supabase/migrations/0001_initial_schema.sql`.
+3. Run `supabase/migrations/0002_enhanced_rls_and_owner_bootstrap.sql`.
+4. Follow [docs/OWNER_BOOTSTRAP.md](docs/OWNER_BOOTSTRAP.md) to bootstrap your initial institute owner account safely.
+
+---
+
+## Documentation Links
+
+- [Owner Bootstrap Guide](docs/OWNER_BOOTSTRAP.md)
+- [Database & Security Architecture](docs/DATABASE_ARCHITECTURE.md)
+- [Milestone 1 Implementation Plan](docs/superpowers/plans/2026-11-20-milestone-1-foundation-auth-rbac.md)
