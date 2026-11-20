@@ -1,5 +1,5 @@
 import React from "react";
-import { Menu, CalendarDays, Bell, LogOut, Shield } from "lucide-react";
+import { Menu, CalendarDays, Bell, LogOut } from "lucide-react";
 import type { UserRole } from "../../types";
 
 export interface TopbarProps {

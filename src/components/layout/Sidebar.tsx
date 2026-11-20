@@ -11,8 +11,8 @@ import {
   X,
   ChevronDown,
   LogOut,
-  ShieldAlert,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { UserRole } from "../../types";
 import { RoleSwitcherDev } from "./RoleSwitcherDev";
 
@@ -28,7 +28,7 @@ export interface SidebarProps {
 interface NavItem {
   label: string;
   path: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   roles: UserRole[];
 }
 
