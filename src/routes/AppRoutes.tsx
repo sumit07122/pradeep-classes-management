@@ -21,6 +21,9 @@ import { Announcements } from "../pages/Announcements";
 import { Reports } from "../pages/Reports";
 import { Settings } from "../pages/Settings";
 import { Portal } from "../pages/Portal";
+import { FinanceDashboard } from "../pages/FinanceDashboard";
+import { Expenses } from "../pages/Expenses";
+import { TeacherPayroll } from "../pages/TeacherPayroll";
 
 export const AppRoutes: React.FC = () => {
   const { role, user, signOut, setDevRole, isDemoMode } = useAuth();
@@ -101,6 +104,36 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={["owner", "admin"]}>
             {wrapWithShell("Fee Management", <Fees />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Finance & Business Analytics */}
+      <Route
+        path="/finance"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            {wrapWithShell("Finance & Analytics", <FinanceDashboard />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Expense Ledger */}
+      <Route
+        path="/finance/expenses"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            {wrapWithShell("Expense Ledger", <Expenses />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Teacher Payroll */}
+      <Route
+        path="/finance/payroll"
+        element={
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            {wrapWithShell("Teacher Payroll", <TeacherPayroll />)}
           </ProtectedRoute>
         }
       />
