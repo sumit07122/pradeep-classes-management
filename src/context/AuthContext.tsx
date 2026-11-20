@@ -39,25 +39,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return !isSupabaseConfigured;
   }, []);
 
+  // Fail-closed profile loader
   const loadUserProfile = useCallback(async (userId: string) => {
-    const profile = await authService.getUserProfile(userId);
-    if (profile) {
-      setUser(profile);
-      setRole(profile.role);
-      setIsAuthenticated(true);
-    } else {
-      // Fallback user if profile row isn't created yet
-      setUser({
-        id: userId,
-        full_name: "Institute Member",
-        role: "student",
-      });
-      setRole("student");
-      setIsAuthenticated(true);
+    const res = await authService.getUserProfile(userId);
+
+    if (res.notProvisioned) {
+      // FAIL CLOSED: No synthetic profile created
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError(
+        "Access denied: No institute profile has been provisioned for this authenticated user. Contact institute owner."
+      );
+      await authService.signOut();
+      return;
     }
+
+    if (res.error || !res.profile) {
+      // Database/network error: FAIL CLOSED
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError(
+        `Database authorization error: ${res.error || "Unable to retrieve profile permissions."}`
+      );
+      return;
+    }
+
+    setUser(res.profile);
+    setRole(res.profile.role);
+    setIsAuthenticated(true);
+    setAuthError(null);
   }, []);
 
-  // Initialize auth session
+  // Initialize auth session ONCE on mount - completely independent of dev role state
   useEffect(() => {
     let isMounted = true;
 
@@ -65,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
 
       if (!isSupabaseConfigured) {
-        // In local development without Supabase, initialize mock user
+        // Local preview fallback without Supabase
         if (env.isDev) {
           const devUser: UserProfile = {
             id: "dev-mock-admin-id",
@@ -96,11 +109,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           setIsAuthenticated(false);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Auth initialization error:", err);
         if (isMounted) {
           setUser(null);
           setIsAuthenticated(false);
+          setAuthError("Failed to initialize authentication session.");
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -109,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen for auth state changes
+    // Attach auth state change listener with safe cleanup
     const { unsubscribe } = authService.onAuthStateChange(async (userId) => {
       if (!isMounted) return;
       if (userId) {
@@ -124,7 +138,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       unsubscribe();
     };
-  }, [loadUserProfile, role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadUserProfile]);
 
   const signIn = async (email: string, password: string) => {
     setAuthError(null);
@@ -144,16 +159,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     }
 
-    const { user: authedUser, error } = await authService.signIn(email, password);
+    const res = await authService.signIn(email, password);
     setIsLoading(false);
 
-    if (error || !authedUser) {
-      setAuthError(error || "Invalid login credentials.");
-      return { success: false, error: error || "Invalid login credentials." };
+    if (res.error || !res.user) {
+      setAuthError(res.error || "Authentication failed.");
+      return { success: false, error: res.error || "Authentication failed." };
     }
 
-    setUser(authedUser);
-    setRole(authedUser.role);
+    setUser(res.user);
+    setRole(res.user.role);
     setIsAuthenticated(true);
     return { success: true };
   };
@@ -167,9 +182,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setDevRole = (newRole: UserRole) => {
-    // STRICT GUARD: Only allowable in development
+    // STRICT SECURITY GUARD: Only allowable in development mode
     if (!env.isDev || !env.enableDevRoleSwitch) {
-      console.warn("Dev role switching is forbidden in production.");
+      console.warn("Dev role switching is strictly forbidden in production builds.");
       return;
     }
     setRole(newRole);

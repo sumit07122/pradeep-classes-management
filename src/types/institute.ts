@@ -7,6 +7,7 @@ export interface Student {
   class_name: string;
   batch_name: string;
   batch_id?: string;
+  profile_id?: string;
   phone: string;
   parent_name?: string;
   parent_phone?: string;

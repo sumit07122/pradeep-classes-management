@@ -1,9 +1,16 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import type { UserProfile, UserRole } from "../types";
 
+export interface ProfileResult {
+  profile: UserProfile | null;
+  error?: string;
+  notProvisioned?: boolean;
+}
+
 export interface AuthResponse {
   user: UserProfile | null;
   error?: string;
+  notProvisioned?: boolean;
 }
 
 export const authService = {
@@ -16,9 +23,9 @@ export const authService = {
     return data.session;
   },
 
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
+  async getUserProfile(userId: string): Promise<ProfileResult> {
     if (!isSupabaseConfigured || !supabase) {
-      return null;
+      return { profile: null, notProvisioned: true };
     }
     try {
       const { data, error } = await supabase
@@ -27,21 +34,29 @@ export const authService = {
         .eq("id", userId)
         .single();
 
-      if (error || !data) {
-        console.warn("Could not fetch user profile from Supabase:", error?.message);
-        return null;
+      if (error) {
+        // PGRST116 indicates row not found in PostgREST
+        if (error.code === "PGRST116" || error.message?.includes("zero rows")) {
+          return { profile: null, notProvisioned: true };
+        }
+        return { profile: null, error: error.message };
+      }
+
+      if (!data) {
+        return { profile: null, notProvisioned: true };
       }
 
       return {
-        id: data.id,
-        full_name: data.full_name,
-        role: data.role as UserRole,
-        phone: data.phone || undefined,
-        created_at: data.created_at,
+        profile: {
+          id: data.id,
+          full_name: data.full_name,
+          role: data.role as UserRole,
+          phone: data.phone || undefined,
+          created_at: data.created_at,
+        },
       };
-    } catch (err) {
-      console.error("Error retrieving profile:", err);
-      return null;
+    } catch (err: any) {
+      return { profile: null, error: err?.message || "Network error loading user profile." };
     }
   },
 
@@ -65,21 +80,31 @@ export const authService = {
       };
     }
 
-    const profile = await this.getUserProfile(data.user.id);
-    if (!profile) {
+    // Explicitly load profile and FAIL CLOSED if unprovisioned
+    const profileRes = await this.getUserProfile(data.user.id);
+
+    if (profileRes.notProvisioned) {
+      // Invalidate session immediately to prevent unprovisioned access
+      await supabase.auth.signOut();
       return {
-        user: {
-          id: data.user.id,
-          full_name: data.user.email?.split("@")[0] || "Institute User",
-          email: data.user.email,
-          role: "student", // default safe fallback role
-        },
+        user: null,
+        notProvisioned: true,
+        error:
+          "Account verified, but no institute profile has been provisioned for your user ID. Please contact your institute administrator.",
+      };
+    }
+
+    if (profileRes.error || !profileRes.profile) {
+      await supabase.auth.signOut();
+      return {
+        user: null,
+        error: `Database authorization error: ${profileRes.error || "Unable to retrieve profile permissions."}`,
       };
     }
 
     return {
       user: {
-        ...profile,
+        ...profileRes.profile,
         email: data.user.email,
       },
     };
@@ -96,11 +121,14 @@ export const authService = {
       return { unsubscribe: () => {} };
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Run callback asynchronously to avoid session-lock issues in Supabase JS
+      setTimeout(() => {
         callback(session?.user?.id || null);
-      }
-    );
+      }, 0);
+    });
 
     return {
       unsubscribe: () => subscription.unsubscribe(),
