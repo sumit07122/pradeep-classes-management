@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { ClipboardCheck, IndianRupee, BookOpen, Calendar, Award, AlertCircle } from "lucide-react";
+import {
+  ClipboardCheck,
+  IndianRupee,
+  BookOpen,
+  Calendar,
+  Award,
+  AlertCircle,
+  FileText,
+  CheckCircle2,
+} from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { StatCard, Badge, LoadingSpinner } from "../components/common";
+import { StatCard, Badge, LoadingSpinner, Button } from "../components/common";
 import { attendanceService } from "../services/attendanceService";
+import { feesService } from "../services/feesService";
+import { PrintableReceiptModal } from "../components/fees";
 import { supabase } from "../lib/supabase";
-import type { StudentAttendanceStats } from "../types";
+import type { StudentAttendanceStats, FeeRecord } from "../types";
 
 export const Portal: React.FC = () => {
   const { user, role, isDemoMode } = useAuth();
@@ -27,6 +38,9 @@ export const Portal: React.FC = () => {
       note: string | null;
     }[]
   >([]);
+
+  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
+  const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -95,6 +109,14 @@ export const Portal: React.FC = () => {
         } catch (e) {
           console.warn("Could not load recent attendance logs:", e);
         }
+
+        // Load live fee records
+        try {
+          const fees = await feesService.getStudentFeeRecords(targetStudentId);
+          setFeeRecords(fees);
+        } catch (e) {
+          console.warn("Could not load student fee records:", e);
+        }
       }
     } catch (err) {
       console.error("Error loading portal data:", err);
@@ -112,6 +134,30 @@ export const Portal: React.FC = () => {
   const attendanceRate = attendanceStats?.percentage ?? 100;
   const isDefaulter = attendanceStats?.is_defaulter ?? false;
 
+  // Fee calculation
+  const totalFeeBilled = feeRecords.reduce((acc, r) => acc + r.amount, 0);
+  const totalFeePaid = feeRecords.reduce((acc, r) => acc + r.paid_amount, 0);
+  const totalFeeDue = Math.max(0, totalFeeBilled - totalFeePaid);
+  const isFeeFullySettled = totalFeeDue === 0 && feeRecords.length > 0;
+
+  const handleOpenReceipt = (rec: FeeRecord) => {
+    setActiveReceipt({
+      receipt_no: rec.receipt_no || "REC-2026-0000",
+      student_name: studentInfo?.full_name || "Student",
+      admission_no: studentInfo?.admission_no || "PC-2026-XXXX",
+      batch_name: studentInfo?.batch_name || "Batch",
+      title: rec.title,
+      amount_paid: rec.paid_amount,
+      total_paid: rec.paid_amount,
+      total_amount: rec.amount,
+      balance_due: rec.balance_due,
+      payment_mode: rec.payment_mode || "Online",
+      payment_date: rec.paid_date || rec.due_date,
+      transaction_ref: rec.transaction_ref || undefined,
+      notes: rec.notes || undefined,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -121,8 +167,8 @@ export const Portal: React.FC = () => {
           <h1>Welcome, {displayName}</h1>
           <p>
             {role === "parent"
-              ? "Monitor your ward's classroom attendance, batch schedule, and academic standing."
-              : "Review your attendance progress, enrolled batch schedule, and academic records."}
+              ? "Monitor your ward's classroom attendance, tuition fee schedule, and official receipts."
+              : "Review your attendance progress, enrolled batch schedule, and tuition fee records."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -159,11 +205,23 @@ export const Portal: React.FC = () => {
         />
         <StatCard
           title="Fee Status"
-          value="In Good Standing"
-          delta="Current Term"
-          note="verified"
+          value={
+            feeRecords.length === 0
+              ? "In Good Standing"
+              : isFeeFullySettled
+              ? "Fully Settled"
+              : `₹${totalFeeDue.toLocaleString("en-IN")}`
+          }
+          delta={
+            feeRecords.length === 0
+              ? "Verified"
+              : isFeeFullySettled
+              ? "All Clear"
+              : "Outstanding Balance"
+          }
+          note={isFeeFullySettled ? "no pending dues" : `₹${totalFeePaid.toLocaleString("en-IN")} paid`}
           icon={IndianRupee}
-          tone="blue"
+          tone={isFeeFullySettled || feeRecords.length === 0 ? "green" : "amber"}
           isDemo={isDemoMode && !studentInfo}
         />
         <StatCard
@@ -186,7 +244,7 @@ export const Portal: React.FC = () => {
         />
       </section>
 
-      {/* Main Grid: Attendance Log & Announcements */}
+      {/* Main Grid: Attendance Log & Fee Receipts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Attendance Log */}
         <section className="panel">
@@ -244,31 +302,89 @@ export const Portal: React.FC = () => {
           )}
         </section>
 
-        {/* Notices */}
+        {/* Tuition Fee Invoices & Receipts */}
         <section className="panel">
           <div className="panel-heading">
             <div>
-              <h3>Institute Notices & Academic Guidelines</h3>
-              <p>Direct updates from Pradeep Classes administration</p>
+              <h3>Tuition Fee & Receipts</h3>
+              <p>Invoiced terms, payment records, and official receipts</p>
             </div>
+            {feeRecords.length > 0 && (
+              <span className="text-xs font-semibold text-slate-500">
+                ₹{totalFeePaid.toLocaleString("en-IN")} of ₹{totalFeeBilled.toLocaleString("en-IN")}
+              </span>
+            )}
           </div>
-          <div className="space-y-3 text-xs">
-            <div className="p-3 rounded-lg bg-[#eaf2fa] border border-[#cde0f1] text-[#24496c]">
-              <b className="block font-bold mb-1">Sunday Test Series Attendance</b>
-              <p className="text-[11px] leading-relaxed">
-                Attendance for Sunday test series is mandatory for all JEE and NEET batches. Absences without prior medical leave will require coordinator sanction.
-              </p>
-            </div>
 
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
-              <b className="block font-bold mb-1">Daily Roll Call Timing</b>
-              <p className="text-[11px] leading-relaxed">
-                Classroom roll call is recorded within the first 15 minutes of each lecture. Students arriving after 15 minutes will be marked as Late.
-              </p>
+          {loading ? (
+            <div className="py-12 flex justify-center">
+              <LoadingSpinner size="md" />
             </div>
-          </div>
+          ) : feeRecords.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-1" />
+              No tuition fee invoices or pending dues recorded for your account.
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {feeRecords.map((r) => (
+                <div
+                  key={r.id}
+                  className="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div>
+                    <div className="font-semibold text-slate-900">{r.title}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      Total: ₹{r.amount.toLocaleString("en-IN")} • Due: {r.due_date}
+                      {r.balance_due > 0 && (
+                        <span className="text-rose-600 font-bold ml-1">
+                          (₹{r.balance_due.toLocaleString("en-IN")} remaining)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        r.status === "paid"
+                          ? "success"
+                          : r.status === "partial"
+                          ? "warning"
+                          : r.status === "overdue"
+                          ? "danger"
+                          : "info"
+                      }
+                      size="sm"
+                      showDot
+                    >
+                      {r.status.toUpperCase()}
+                    </Badge>
+
+                    {r.receipt_no && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenReceipt(r)}
+                        icon={<FileText size={12} />}
+                      >
+                        Receipt
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
+
+      {/* Printable Receipt Modal */}
+      <PrintableReceiptModal
+        isOpen={Boolean(activeReceipt)}
+        onClose={() => setActiveReceipt(null)}
+        receipt={activeReceipt}
+      />
     </div>
   );
 };

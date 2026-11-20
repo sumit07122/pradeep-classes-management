@@ -92,25 +92,7 @@ export interface StudentFilterParams {
 
 
 
-export interface FeeSummary {
-  totalTarget: number;
-  totalCollected: number;
-  totalPending: number;
-  collectionPercentage: number;
-  pendingCount: number;
-}
 
-export interface FeeRecord {
-  id: string;
-  student_id: string;
-  student_name?: string;
-  batch_name?: string;
-  amount: number;
-  status: "paid" | "pending" | "partial" | "overdue";
-  due_date: string;
-  paid_date?: string;
-  receipt_no?: string;
-}
 
 export interface AuditLog {
   id: string;
