@@ -130,7 +130,7 @@ export const Timetable: React.FC = () => {
     }
   };
 
-  const canEdit = role === "owner" || role === "admin";
+  const canEdit = role === "super_admin" || role === "owner" || role === "admin";
 
   return (
     <div className="space-y-6">

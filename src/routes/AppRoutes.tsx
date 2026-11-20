@@ -118,7 +118,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/fees"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
             {wrapWithShell("Fee Management", <Fees />)}
           </ProtectedRoute>
         }
@@ -128,7 +128,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
             {wrapWithShell("Finance & Analytics", <FinanceDashboard />)}
           </ProtectedRoute>
         }
@@ -138,7 +138,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/expenses"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
             {wrapWithShell("Expense Ledger", <Expenses />)}
           </ProtectedRoute>
         }
@@ -148,7 +148,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/payroll"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "admin"]}>
             {wrapWithShell("Teacher Payroll", <TeacherPayroll />)}
           </ProtectedRoute>
         }

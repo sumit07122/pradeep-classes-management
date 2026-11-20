@@ -11,6 +11,8 @@ export const Unauthorized: React.FC = () => {
   const handleReturnHome = () => {
     if (role === "student") {
       navigate("/portal");
+    } else if (role === "super_admin") {
+      navigate("/platform");
     } else {
       navigate("/dashboard");
     }

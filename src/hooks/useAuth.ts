@@ -5,6 +5,7 @@ import type { UserRole } from "../types";
 
 export function useAuth(): AuthContextType & {
   hasRole: (allowedRoles: UserRole[]) => boolean;
+  isSuperAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
   isTeacher: boolean;
@@ -26,6 +27,7 @@ export function useAuth(): AuthContextType & {
   return {
     ...context,
     hasRole,
+    isSuperAdmin: role === "super_admin",
     isOwner: role === "owner",
     isAdmin: role === "admin",
     isTeacher: role === "teacher",

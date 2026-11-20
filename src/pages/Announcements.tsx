@@ -194,7 +194,7 @@ export const Announcements: React.FC = () => {
     }
   };
 
-  const canBroadcast = role === "owner" || role === "admin";
+  const canBroadcast = role === "super_admin" || role === "owner" || role === "admin";
 
   return (
     <div className="space-y-6">
