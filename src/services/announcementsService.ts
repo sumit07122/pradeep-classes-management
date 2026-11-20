@@ -106,4 +106,55 @@ export const announcementsService = {
       return { success: false, error: err.message || "Failed to remove announcement" };
     }
   },
+
+  async updateAnnouncement(
+    id: string,
+    ann: Partial<Omit<Announcement, "id" | "created_at" | "institute_id">>
+  ): Promise<{ data: Announcement | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { data: null, error: "Database not configured" };
+
+    try {
+      const payload: Record<string, any> = {};
+      if (ann.title !== undefined) payload.title = ann.title.trim();
+      if (ann.message !== undefined) {
+        payload.message = ann.message.trim();
+        payload.content = ann.message.trim();
+      }
+      if (ann.target_role !== undefined) {
+        payload.target_role = ann.target_role;
+        payload.target_type = ann.target_role;
+      }
+      if (ann.priority !== undefined) payload.priority = ann.priority;
+      if (ann.batch_id !== undefined) {
+        payload.batch_id = ann.batch_id || null;
+        payload.target_batch_id = ann.batch_id || null;
+      }
+
+      const { data, error } = await supabase
+        .from("announcements")
+        .update(payload)
+        .eq("id", id)
+        .select("*, batches:target_batch_id(name)")
+        .single();
+
+      if (error) throw error;
+
+      return {
+        data: {
+          id: data.id,
+          institute_id: data.institute_id,
+          title: data.title,
+          message: data.content || data.message,
+          target_role: data.target_type || data.target_role,
+          batch_id: data.target_batch_id || data.batch_id,
+          batch_name: data.batches?.name || (data.target_type === "all" ? "All Students" : "General"),
+          priority: data.priority,
+          created_by: data.created_by,
+          created_at: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to update announcement" };
+    }
+  },
 };

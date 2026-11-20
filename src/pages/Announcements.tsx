@@ -8,6 +8,8 @@ import {
   Phone,
   ShieldCheck,
   RefreshCw,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { announcementsService } from "../services/announcementsService";
@@ -28,6 +30,9 @@ export const Announcements: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Announcement Form State
   const [form, setForm] = useState<{
@@ -71,7 +76,47 @@ export const Announcements: React.FC = () => {
     }
   };
 
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setForm({
+      title: "",
+      message: "",
+      target_role: "all",
+      priority: "normal",
+      batch_id: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleStartEdit = (ann: Announcement) => {
+    setEditingId(ann.id);
+    setForm({
+      title: ann.title,
+      message: ann.message,
+      target_role: ann.target_role || "all",
+      priority: (ann.priority as any) || "normal",
+      batch_id: ann.batch_id || "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!window.confirm("Are you sure you want to remove this announcement?")) {
+      return;
+    }
+    setDeletingId(id);
+    setErrorNotice(null);
+    const res = await announcementsService.deleteAnnouncement(id);
+    setDeletingId(null);
+    if (res.success) {
+      setSuccessNotice("Announcement removed successfully.");
+      loadData();
+    } else {
+      setErrorNotice(res.error || "Failed to delete announcement.");
+    }
+  };
+
+  const handleCreateOrUpdateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.message) {
       setErrorNotice("Title and message body are required.");
@@ -81,21 +126,37 @@ export const Announcements: React.FC = () => {
     setIsSubmitting(true);
     setErrorNotice(null);
 
-    const res = await announcementsService.createAnnouncement({
-      title: form.title,
-      message: form.message,
-      target_role: form.target_role,
-      priority: form.priority,
-      batch_id: form.batch_id || null,
-    });
+    let res;
+    if (editingId) {
+      res = await announcementsService.updateAnnouncement(editingId, {
+        title: form.title,
+        message: form.message,
+        target_role: form.target_role,
+        priority: form.priority,
+        batch_id: form.batch_id || null,
+      });
+    } else {
+      res = await announcementsService.createAnnouncement({
+        title: form.title,
+        message: form.message,
+        target_role: form.target_role,
+        priority: form.priority,
+        batch_id: form.batch_id || null,
+      });
+    }
 
     setIsSubmitting(false);
 
     if (res.error) {
       setErrorNotice(res.error);
     } else {
-      setSuccessNotice("Announcement broadcasted successfully.");
+      setSuccessNotice(
+        editingId
+          ? "Announcement updated successfully."
+          : "Announcement broadcasted successfully."
+      );
       setIsModalOpen(false);
+      setEditingId(null);
       setForm({
         title: "",
         message: "",
@@ -174,7 +235,7 @@ export const Announcements: React.FC = () => {
             <Button
               variant="primary"
               icon={<Plus size={16} />}
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleOpenCreate}
             >
               New Announcement
             </Button>
@@ -269,9 +330,32 @@ export const Announcements: React.FC = () => {
                     )}
                   </div>
 
-                  <span className="text-xs text-slate-400">
-                    {new Date(a.created_at).toLocaleString()}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400">
+                      {new Date(a.created_at).toLocaleString()}
+                    </span>
+                    {canBroadcast && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(a)}
+                          className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded-md transition"
+                          title="Edit Announcement"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === a.id}
+                          onClick={() => handleDeleteAnnouncement(a.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-50"
+                          title="Delete Announcement"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <h3 className="font-bold text-slate-900 text-lg leading-snug">{a.title}</h3>
@@ -387,10 +471,13 @@ export const Announcements: React.FC = () => {
       {isModalOpen && (
         <Modal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Create Broadcast Announcement"
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingId(null);
+          }}
+          title={editingId ? "Edit Announcement" : "Create Broadcast Announcement"}
         >
-          <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+          <form onSubmit={handleCreateOrUpdateAnnouncement} className="space-y-4">
             <Input
               label="Subject / Heading"
               required
@@ -449,7 +536,10 @@ export const Announcements: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingId(null);
+                }}
               >
                 Cancel
               </Button>
@@ -459,7 +549,7 @@ export const Announcements: React.FC = () => {
                 isLoading={isSubmitting}
                 icon={<Send size={16} />}
               >
-                Publish Broadcast
+                {editingId ? "Save Changes" : "Publish Broadcast"}
               </Button>
             </div>
           </form>
