@@ -7,3 +7,4 @@ export * from "./materials";
 export * from "./timetable";
 export * from "./communication";
 export * from "./settings";
+export * from "./diary";

@@ -17,6 +17,7 @@ export const RoleSwitcherDev: React.FC<RoleSwitcherDevProps> = ({
   }
 
   const roles: { role: UserRole; label: string }[] = [
+    { role: "super_admin", label: "Super Admin" },
     { role: "owner", label: "Owner" },
     { role: "admin", label: "Admin" },
     { role: "teacher", label: "Teacher" },

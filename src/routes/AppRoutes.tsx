@@ -24,6 +24,8 @@ import { Portal } from "../pages/Portal";
 import { FinanceDashboard } from "../pages/FinanceDashboard";
 import { Expenses } from "../pages/Expenses";
 import { TeacherPayroll } from "../pages/TeacherPayroll";
+import { ClassDiary } from "../pages/ClassDiary";
+import { PlatformAdmin } from "../pages/PlatformAdmin";
 
 export const AppRoutes: React.FC = () => {
   const { role, user, signOut, setDevRole, isDemoMode } = useAuth();
@@ -48,13 +50,27 @@ export const AppRoutes: React.FC = () => {
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/config-error" element={<ConfigError />} />
 
+      {/* Super Admin Platform Console */}
+      <Route
+        path="/platform"
+        element={
+          <ProtectedRoute allowedRoles={["super_admin"]}>
+            {wrapWithShell("Platform Master Console", <PlatformAdmin />)}
+          </ProtectedRoute>
+        }
+      />
+
       {/* Overview / Dashboard */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
-            {wrapWithShell("Overview", <Dashboard />)}
-          </ProtectedRoute>
+          role === "student" ? (
+            <Navigate to="/portal" replace />
+          ) : (
+            <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher"]}>
+              {wrapWithShell("Overview", <Dashboard />)}
+            </ProtectedRoute>
+          )
         }
       />
 
@@ -62,7 +78,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/students"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Students", <Students />)}
           </ProtectedRoute>
         }
@@ -72,7 +88,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/teachers"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Teachers", <Teachers />)}
           </ProtectedRoute>
         }
@@ -82,7 +98,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/batches"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher"]}>
             {wrapWithShell("Batches", <Batches />)}
           </ProtectedRoute>
         }
@@ -92,7 +108,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/attendance"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher"]}>
             {wrapWithShell("Attendance", <Attendance />)}
           </ProtectedRoute>
         }
@@ -102,7 +118,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/fees"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Fee Management", <Fees />)}
           </ProtectedRoute>
         }
@@ -112,7 +128,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Finance & Analytics", <FinanceDashboard />)}
           </ProtectedRoute>
         }
@@ -122,7 +138,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/expenses"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Expense Ledger", <Expenses />)}
           </ProtectedRoute>
         }
@@ -132,7 +148,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/payroll"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Teacher Payroll", <TeacherPayroll />)}
           </ProtectedRoute>
         }
@@ -142,8 +158,18 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/academics"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher"]}>
             {wrapWithShell("Exams & Marks", <Academics />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Class Diary & Lesson Tracking (Phase 2) */}
+      <Route
+        path="/diary"
+        element={
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher", "student"]}>
+            {wrapWithShell("Class Diary & Syllabus", <ClassDiary />)}
           </ProtectedRoute>
         }
       />
@@ -152,7 +178,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/timetable"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher", "student"]}>
             {wrapWithShell("Timetable", <Timetable />)}
           </ProtectedRoute>
         }
@@ -162,7 +188,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/materials"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher", "student"]}>
             {wrapWithShell("Study Materials", <HomeworkMaterials />)}
           </ProtectedRoute>
         }
@@ -172,7 +198,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/announcements"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin", "teacher", "student"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher", "student"]}>
             {wrapWithShell("Announcements", <Announcements />)}
           </ProtectedRoute>
         }
@@ -182,18 +208,18 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Reports & Export", <Reports />)}
           </ProtectedRoute>
         }
       />
 
-      {/* Institute Settings */}
+      {/* Settings & Profile (Accessible by all roles) */}
       <Route
         path="/settings"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
-            {wrapWithShell("Settings", <Settings />)}
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher", "student"]}>
+            {wrapWithShell("Settings & Profile", <Settings />)}
           </ProtectedRoute>
         }
       />
@@ -202,7 +228,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/portal"
         element={
-          <ProtectedRoute allowedRoles={["student", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["student", "super_admin", "owner", "admin"]}>
             {wrapWithShell("Student Portal", <Portal />)}
           </ProtectedRoute>
         }
@@ -212,11 +238,16 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/"
         element={
-          role === "student" ? (
-            <Navigate to="/portal" replace />
-          ) : (
-            <Navigate to="/dashboard" replace />
-          )
+          <Navigate
+            to={
+              role === "student"
+                ? "/portal"
+                : role === "super_admin"
+                ? "/platform"
+                : "/dashboard"
+            }
+            replace
+          />
         }
       />
 

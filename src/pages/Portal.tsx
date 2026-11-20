@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   ClipboardCheck,
   IndianRupee,
@@ -10,6 +11,11 @@ import {
   Clock,
   Printer,
   ShieldAlert,
+  Flame,
+  Trophy,
+  FileCheck2,
+  Sparkles,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { StatCard, Badge, LoadingSpinner, Button } from "../components/common";
@@ -18,16 +24,20 @@ import { feesService } from "../services/feesService";
 import { academicsService } from "../services/academicsService";
 import { materialsService } from "../services/materialsService";
 import { timetableService } from "../services/timetableService";
+import { diaryService } from "../services/diaryService";
 import { PrintableReceiptModal } from "../components/fees";
 import { supabase } from "../lib/supabase";
 import type { StudentAttendanceStats, FeeRecord } from "../types";
 import type { StudentExamResult } from "../types/academics";
 import type { StudyMaterial } from "../types/materials";
 import type { TimetableEntry } from "../types/timetable";
+import type { StudentStreak, StudentBadge, StudentPointsRecord, StudentCertificate } from "../types/diary";
 
 export const Portal: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"attendance" | "exams" | "fees" | "materials" | "timetable">("attendance");
+  const [activeTab, setActiveTab] = useState<
+    "attendance" | "exams" | "fees" | "materials" | "timetable" | "gamification" | "certificates"
+  >("attendance");
 
   const [studentInfo, setStudentInfo] = useState<{
     id: string;
@@ -53,6 +63,13 @@ export const Portal: React.FC = () => {
   const [examResults, setExamResults] = useState<StudentExamResult[]>([]);
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
+  const [gamification, setGamification] = useState<{
+    streak: StudentStreak | null;
+    badges: StudentBadge[];
+    points: StudentPointsRecord[];
+    totalPoints: number;
+  }>({ streak: null, badges: [], points: [], totalPoints: 0 });
+  const [certificates, setCertificates] = useState<StudentCertificate[]>([]);
 
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,14 +119,16 @@ export const Portal: React.FC = () => {
           course_name: (targetStudent.batches as any)?.course_name || "Enrolled Course",
         });
 
-        // Parallel fetch for attendance, fees, exams, materials, and timetable
-        const [statsRes, logsRes, feesRes, examsRes, matRes, timeRes] = await Promise.all([
+        // Parallel fetch for attendance, fees, exams, materials, timetable, gamification, and certificates
+        const [statsRes, logsRes, feesRes, examsRes, matRes, timeRes, gamifyRes, certRes] = await Promise.all([
           attendanceService.getStudentAttendanceSummary(targetStudentId).catch(() => null),
           attendanceService.getStudentRecentAttendance(targetStudentId, 10).catch(() => []),
           feesService.getStudentFeeRecords(targetStudentId).catch(() => []),
           academicsService.getStudentExamResults(targetStudentId).catch(() => []),
           materialsService.getStudyMaterials(targetStudent.batch_id).catch(() => ({ data: [] })),
           timetableService.getTimetable(targetStudent.batch_id).catch(() => ({ data: [] })),
+          diaryService.getStudentGamification(targetStudentId).catch(() => ({ streak: null, badges: [], points: [], totalPoints: 0 })),
+          diaryService.getStudentCertificates(targetStudentId).catch(() => []),
         ]);
 
         if (statsRes) setAttendanceStats(statsRes);
@@ -118,6 +137,8 @@ export const Portal: React.FC = () => {
         setExamResults(examsRes);
         setMaterials(matRes.data);
         setTimetable(timeRes.data);
+        setGamification(gamifyRes);
+        setCertificates(certRes);
       }
     } catch (err) {
       console.error("Error loading student portal data:", err);
@@ -177,7 +198,27 @@ export const Portal: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {gamification.streak && gamification.streak.current_attendance_streak > 0 && (
+            <div className="px-3 py-1.5 rounded-lg bg-orange-500/20 border border-orange-400 text-orange-200 text-xs font-extrabold flex items-center gap-1.5">
+              <Flame size={15} className="text-orange-400 animate-pulse" />
+              <span>{gamification.streak.current_attendance_streak} Day Streak!</span>
+            </div>
+          )}
+
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold flex items-center gap-1.5">
+            <Sparkles size={15} />
+            <span>{gamification.totalPoints} Learning Points</span>
+          </div>
+
+          <Link
+            to="/settings"
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition"
+          >
+            <Settings size={14} />
+            <span>My Profile</span>
+          </Link>
+
           {isDefaulter && (
             <div className="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-400 text-rose-200 text-xs font-bold flex items-center gap-1.5">
               <ShieldAlert size={15} />
@@ -247,6 +288,30 @@ export const Portal: React.FC = () => {
         >
           <Clock size={16} />
           Class Timetable
+        </button>
+
+        <button
+          onClick={() => setActiveTab("gamification")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "gamification"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Trophy size={16} />
+          Badges & Streaks ({gamification.badges.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("certificates")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "certificates"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <FileCheck2 size={16} />
+          Certificates ({certificates.length})
         </button>
       </div>
 
@@ -580,6 +645,132 @@ export const Portal: React.FC = () => {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab 6: Gamification */}
+      {activeTab === "gamification" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard
+              title="Attendance Streak"
+              value={`${gamification.streak?.current_attendance_streak || 0} Days`}
+              icon={Flame}
+              note={`Personal Best: ${gamification.streak?.longest_attendance_streak || 0} Days`}
+              tone="amber"
+            />
+            <StatCard
+              title="Badges Unlocked"
+              value={gamification.badges.length}
+              icon={Trophy}
+              note="Academic Milestones"
+              tone="amber"
+            />
+            <StatCard
+              title="Total Learning Points"
+              value={gamification.totalPoints}
+              icon={Sparkles}
+              note="Redeemable Rewards"
+              tone="violet"
+            />
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Earned Badges & Achievements</h3>
+            <p className="text-xs text-slate-500 mb-6">Punctuality, test performance, and academic consistency awards.</p>
+
+            {gamification.badges.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 italic text-xs">
+                No badges unlocked yet. Maintain 100% weekly attendance or score A+ in exams to earn badges!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {gamification.badges.map((b) => (
+                  <div key={b.id} className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg shrink-0">
+                      🏆
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{b.badge_name}</h4>
+                      <p className="text-xs text-slate-600 mt-0.5">{b.description}</p>
+                      <span className="text-[10px] text-slate-400 mt-2 block">
+                        Earned: {new Date(b.earned_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Points Ledger */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Points Activity Ledger</h3>
+            <p className="text-xs text-slate-500 mb-4">Chronological record of points earned for attendance, homework, and test scores.</p>
+
+            {gamification.points.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 italic text-xs">
+                No points activities recorded yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {gamification.points.map((p) => (
+                  <div key={p.id} className="py-3 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="font-bold text-slate-800">{p.reason}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(p.created_at).toLocaleDateString()} • {p.event_type}
+                      </div>
+                    </div>
+                    <span className="font-mono font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      +{p.points} PTS
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 7: Certificates */}
+      {activeTab === "certificates" && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="font-bold text-slate-800 text-base mb-1">Official Certificates & Credentials</h3>
+          <p className="text-xs text-slate-500 mb-6">Cryptographically signed and verified certificates issued by Pradeep Classes.</p>
+
+          {certificates.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 italic text-xs">
+              No certificates issued yet. Certificates are published after course completion or milestone tests.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {certificates.map((c) => (
+                <div key={c.id} className="border-2 border-slate-200 rounded-xl p-5 bg-gradient-to-br from-slate-50 to-white relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#16466f] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {c.certificate_type.toUpperCase()}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500">
+                      #{c.certificate_no}
+                    </span>
+                  </div>
+
+                  <h4 className="font-extrabold text-[#102f50] text-base">{c.title}</h4>
+                  <p className="text-xs text-slate-600 mt-1">Course: <b>{c.course_name}</b></p>
+
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
+                    <span className="text-slate-400 text-[11px]">
+                      Issued: {new Date(c.issue_date).toLocaleDateString()}
+                    </span>
+                    <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
+                      <CheckCircle2 size={13} /> Verified Authentic
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   Share2,
   Lock,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { academicsService } from "../services/academicsService";
@@ -26,6 +28,10 @@ export const Academics: React.FC = () => {
   const [isMarksModalOpen, setIsMarksModalOpen] = useState(false);
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
+
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deletingExamId, setDeletingExamId] = useState<string | null>(null);
 
   const [marksStudents, setMarksStudents] = useState<Student[]>([]);
   const [studentMarksState, setStudentMarksState] = useState<{
@@ -201,7 +207,75 @@ export const Academics: React.FC = () => {
     }
   };
 
-  const canManage = role === "owner" || role === "admin" || role === "teacher";
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    subject: "",
+    exam_date: "",
+    total_marks: 100,
+    passing_marks: 40,
+  });
+
+  const handleStartEditExam = (exam: Exam) => {
+    setEditingExam(exam);
+    setEditFormData({
+      title: exam.title,
+      subject: exam.subject,
+      exam_date: exam.exam_date,
+      total_marks: exam.total_marks,
+      passing_marks: exam.passing_marks,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExam) return;
+    setIsSubmitting(true);
+    setErrorNotice(null);
+
+    const res = await academicsService.updateExam(editingExam.id, {
+      title: editFormData.title,
+      subject: editFormData.subject,
+      exam_date: editFormData.exam_date,
+      total_marks: Number(editFormData.total_marks),
+      passing_marks: Number(editFormData.passing_marks),
+    });
+
+    setIsSubmitting(false);
+
+    if (res.error) {
+      setErrorNotice(res.error);
+    } else {
+      setSuccessNotice("Exam updated successfully.");
+      setIsEditModalOpen(false);
+      setEditingExam(null);
+      loadData();
+    }
+  };
+
+  const handleDeleteExam = async (exam: Exam) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete exam "${exam.title}"? This will permanently remove this exam and all associated student marks.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingExamId(exam.id);
+    setErrorNotice(null);
+    const res = await academicsService.deleteExam(exam.id);
+    setDeletingExamId(null);
+
+    if (res.success) {
+      setSuccessNotice("Exam deleted successfully.");
+      loadData();
+    } else {
+      setErrorNotice(res.error || "Failed to delete exam.");
+    }
+  };
+
+  const canManage = role === "super_admin" || role === "owner" || role === "admin" || role === "teacher";
 
   return (
     <div className="space-y-6">
@@ -278,9 +352,32 @@ export const Academics: React.FC = () => {
                     <Badge variant={exam.is_published ? "green" : "neutral"} size="sm">
                       {exam.is_published ? "Published" : "Draft / Unpublished"}
                     </Badge>
-                    <span className="text-xs text-slate-400 font-medium">
-                      {exam.exam_date}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400 font-medium">
+                        {exam.exam_date}
+                      </span>
+                      {canManage && (
+                        <div className="flex items-center gap-1 ml-1 border-l border-slate-200 pl-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditExam(exam)}
+                            className="p-1 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded transition"
+                            title="Edit Exam"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingExamId === exam.id}
+                            onClick={() => handleDeleteExam(exam)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition disabled:opacity-50"
+                            title="Delete Exam"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="font-bold text-slate-900 text-lg leading-snug">{exam.title}</h3>
@@ -412,6 +509,71 @@ export const Academics: React.FC = () => {
                 icon={<CheckCircle2 size={16} />}
               >
                 Create Exam
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Edit Exam Modal */}
+      {isEditModalOpen && editingExam && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingExam(null);
+          }}
+          title={`Edit Exam: ${editingExam.title}`}
+        >
+          <form onSubmit={handleUpdateExam} className="space-y-4">
+            <Input
+              label="Exam Title / Test Name"
+              required
+              value={editFormData.title}
+              onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+            />
+            <Input
+              label="Subject / Topic"
+              required
+              value={editFormData.subject}
+              onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
+            />
+            <Input
+              label="Exam Date"
+              type="date"
+              required
+              value={editFormData.exam_date}
+              onChange={(e) => setEditFormData({ ...editFormData, exam_date: e.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Maximum Marks"
+                type="number"
+                required
+                value={editFormData.total_marks}
+                onChange={(e) => setEditFormData({ ...editFormData, total_marks: Number(e.target.value) })}
+              />
+              <Input
+                label="Passing Marks"
+                type="number"
+                required
+                value={editFormData.passing_marks}
+                onChange={(e) => setEditFormData({ ...editFormData, passing_marks: Number(e.target.value) })}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingExam(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" isLoading={isSubmitting}>
+                Save Changes
               </Button>
             </div>
           </form>

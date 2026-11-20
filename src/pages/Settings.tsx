@@ -4,15 +4,39 @@ import {
   MessageSquare,
   Save,
   Info,
+  User,
+  KeyRound,
+  ShieldCheck,
+  GraduationCap,
+  Users,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice } from "../components/common";
 import { settingsService } from "../services/settingsService";
+import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../lib/supabase";
 import type { InstituteSettings, WhatsAppSettings } from "../types/settings";
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"profile" | "whatsapp">("profile");
+  const { role, user } = useAuth();
+  const isManagement = ["super_admin", "owner", "admin"].includes(role);
+
+  const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp">(
+    isManagement ? "my-profile" : "my-profile"
+  );
+
   const [instituteSettings, setInstituteSettings] = useState<InstituteSettings | null>(null);
   const [whatsappSettings, setWhatsappSettings] = useState<WhatsAppSettings | null>(null);
+
+  // Personal Profile State
+  const [fullName, setFullName] = useState(user?.full_name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [linkedDetails, setLinkedDetails] = useState<any | null>(null);
+
+  // Security / Password State
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -20,21 +44,104 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [user]);
 
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const [instRes, waRes] = await Promise.all([
-        settingsService.getInstituteSettings(),
-        settingsService.getWhatsAppSettings(),
-      ]);
-      setInstituteSettings(instRes.data);
-      setWhatsappSettings(waRes.data);
+      if (user) {
+        setFullName(user.full_name || "");
+        setPhone(user.phone || "");
+
+        // If student or teacher, load their profile details
+        if (role === "student" && supabase) {
+          const { data: sData } = await supabase
+            .from("students")
+            .select("*, batches(name, course_name)")
+            .eq("profile_id", user.id)
+            .maybeSingle();
+          if (sData) setLinkedDetails(sData);
+        } else if (role === "teacher" && supabase) {
+          const { data: tData } = await supabase
+            .from("teachers")
+            .select("*")
+            .eq("profile_id", user.id)
+            .maybeSingle();
+          if (tData) setLinkedDetails(tData);
+        }
+      }
+
+      if (isManagement) {
+        const [instRes, waRes] = await Promise.all([
+          settingsService.getInstituteSettings(),
+          settingsService.getWhatsAppSettings(),
+        ]);
+        setInstituteSettings(instRes.data);
+        setWhatsappSettings(waRes.data);
+      }
     } catch (err: any) {
       setErrorNotice(err.message || "Failed to load settings.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSavePersonalProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !supabase) return;
+
+    setIsSaving(true);
+    setErrorNotice(null);
+    setSuccessNotice(null);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName.trim(),
+          phone: phone.trim() || null,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      setSuccessNotice("Personal profile details updated successfully!");
+    } catch (err: any) {
+      setErrorNotice(err.message || "Failed to update profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setErrorNotice("Password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorNotice("Passwords do not match.");
+      return;
+    }
+
+    if (!supabase) return;
+
+    setIsUpdatingPassword(true);
+    setErrorNotice(null);
+    setSuccessNotice(null);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+      setSuccessNotice("Your password has been changed securely.");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setErrorNotice(err.message || "Failed to update password.");
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -105,44 +212,66 @@ export const Settings: React.FC = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner label="Loading settings..." size="lg" />;
+    return <LoadingSpinner label="Loading settings & profile..." size="lg" />;
   }
 
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Top Header */}
       <div>
-        <div className="eyebrow">INSTITUTE SYSTEM CONFIGURATION</div>
-        <h1 className="text-2xl font-extrabold text-[#102f50]">Institute Settings</h1>
+        <div className="eyebrow">
+          {isManagement ? "INSTITUTE SYSTEM & PROFILE" : "USER ACCOUNT & PROFILE"}
+        </div>
+        <h1 className="text-2xl font-extrabold text-[#102f50]">
+          {isManagement ? "Settings & Profile" : "My Profile & Account Settings"}
+        </h1>
         <p className="text-sm text-slate-500">
-          Configure Pradeep Classes profile, academic standards, and Meta WhatsApp Cloud API credentials.
+          {isManagement
+            ? "Configure Pradeep Classes profile, academic standards, credentials, and manage your account."
+            : "Manage your personal profile, credentials, security, and linked institute records."}
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button
-          onClick={() => setActiveTab("profile")}
+          onClick={() => setActiveTab("my-profile")}
           className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
-            activeTab === "profile"
+            activeTab === "my-profile"
               ? "border-[#16466f] text-[#16466f]"
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Building2 size={17} />
-          Institute Profile & Academics
+          <User size={17} />
+          My Profile & Security
         </button>
-        <button
-          onClick={() => setActiveTab("whatsapp")}
-          className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
-            activeTab === "whatsapp"
-              ? "border-[#16466f] text-[#16466f]"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          <MessageSquare size={17} />
-          WhatsApp Cloud API Integration
-        </button>
+
+        {isManagement && (
+          <>
+            <button
+              onClick={() => setActiveTab("profile")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "profile"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Building2 size={17} />
+              Institute Profile & Academics
+            </button>
+            <button
+              onClick={() => setActiveTab("whatsapp")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "whatsapp"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <MessageSquare size={17} />
+              WhatsApp Cloud API Integration
+            </button>
+          </>
+        )}
       </div>
 
       {errorNotice && (
@@ -161,7 +290,178 @@ export const Settings: React.FC = () => {
         />
       )}
 
-      {activeTab === "profile" && instituteSettings && (
+      {/* TAB 1: My Personal Profile & Security */}
+      {activeTab === "my-profile" && (
+        <div className="space-y-6">
+          <form
+            onSubmit={handleSavePersonalProfile}
+            className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5"
+          >
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Personal Identification</h3>
+                <p className="text-xs text-slate-500">
+                  Your registered account details on Pradeep Classes Management Platform.
+                </p>
+              </div>
+              <Badge
+                variant={
+                  role === "super_admin"
+                    ? "violet"
+                    : role === "owner"
+                    ? "amber"
+                    : role === "admin"
+                    ? "info"
+                    : role === "teacher"
+                    ? "warning"
+                    : "neutral"
+                }
+                size="md"
+              >
+                {role.toUpperCase()}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Full Name"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+              <Input
+                label="Registered Email (Account Login)"
+                disabled
+                value={user?.email || "user@pradeepclasses.in"}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Contact Phone"
+                placeholder="+91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <Input
+                label="Institute / Branch"
+                disabled
+                value="Pradeep Classes (Main Campus)"
+              />
+            </div>
+
+            {/* If Student: Show Academic Info */}
+            {role === "student" && linkedDetails && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                <div className="font-bold text-slate-800 flex items-center gap-1.5 text-sm mb-1">
+                  <GraduationCap size={16} className="text-[#16466f]" />
+                  Enrolled Student Records
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-700">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Admission No</span>
+                    <b className="font-mono">{linkedDetails.admission_no || "N/A"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Enrolled Batch</span>
+                    <b>{linkedDetails.batches?.name || "Assigned Batch"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Parent / Emergency Phone</span>
+                    <b>{linkedDetails.parent_phone || "Not set"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Academic Status</span>
+                    <Badge variant={linkedDetails.status === "active" ? "success" : "neutral"} size="sm">
+                      {linkedDetails.status || "Active"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* If Teacher: Show Faculty Info */}
+            {role === "teacher" && linkedDetails && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                <div className="font-bold text-slate-800 flex items-center gap-1.5 text-sm mb-1">
+                  <Users size={16} className="text-[#16466f]" />
+                  Faculty Profile
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-slate-700">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Specialization</span>
+                    <b>{linkedDetails.specialization || "Senior Faculty"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Qualifications</span>
+                    <b>{linkedDetails.qualification || "M.Sc., B.Ed."}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Faculty Status</span>
+                    <Badge variant="success" size="sm">Active Faculty</Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isSaving}
+                icon={<Save size={16} />}
+              >
+                Save Profile Details
+              </Button>
+            </div>
+          </form>
+
+          {/* Security & Password Reset */}
+          <form
+            onSubmit={handleUpdatePassword}
+            className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4"
+          >
+            <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
+              <KeyRound size={18} className="text-[#16466f]" />
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Account Security & Password</h3>
+                <p className="text-xs text-slate-500">Update your login credentials securely.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="New Password"
+                type="password"
+                placeholder="At least 6 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                placeholder="Re-enter new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                type="submit"
+                variant="secondary"
+                isLoading={isUpdatingPassword}
+                icon={<ShieldCheck size={16} />}
+              >
+                Update Password
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 2: Institute Profile & Academics */}
+      {activeTab === "profile" && isManagement && instituteSettings && (
         <form onSubmit={handleSaveInstituteSettings} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div className="border-b border-slate-100 pb-4">
             <h3 className="font-bold text-slate-800 text-base">Institute Identification</h3>
@@ -268,7 +568,8 @@ export const Settings: React.FC = () => {
         </form>
       )}
 
-      {activeTab === "whatsapp" && whatsappSettings && (
+      {/* TAB 3: WhatsApp Cloud API */}
+      {activeTab === "whatsapp" && isManagement && whatsappSettings && (
         <form onSubmit={handleSaveWhatsAppSettings} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
             <div>

@@ -112,6 +112,69 @@ export const academicsService = {
     }
   },
 
+  async updateExam(
+    id: string,
+    updates: Partial<CreateExamDTO>
+  ): Promise<{ data: Exam | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: "Database not configured" };
+    }
+    try {
+      const payload: any = {};
+      if (updates.title !== undefined) payload.title = updates.title.trim();
+      if (updates.subject !== undefined) payload.subject = updates.subject;
+      if (updates.exam_date !== undefined) payload.exam_date = updates.exam_date;
+      if (updates.total_marks !== undefined) payload.total_marks = Number(updates.total_marks);
+      if (updates.passing_marks !== undefined) payload.passing_marks = Number(updates.passing_marks);
+      if (updates.duration_minutes !== undefined) payload.duration_minutes = Number(updates.duration_minutes);
+      if (updates.exam_type !== undefined) payload.exam_type = updates.exam_type;
+
+      const { data, error } = await supabase
+        .from("exams")
+        .update(payload)
+        .eq("id", id)
+        .select("*, batches(name)")
+        .single();
+
+      if (error) throw error;
+      return {
+        data: {
+          id: data.id,
+          institute_id: data.institute_id,
+          batch_id: data.batch_id,
+          batch_name: data.batches?.name || "Assigned Batch",
+          title: data.title,
+          subject: data.subject,
+          exam_type: data.exam_type,
+          exam_date: data.exam_date,
+          start_time: data.start_time,
+          duration_minutes: data.duration_minutes,
+          total_marks: Number(data.total_marks),
+          passing_marks: Number(data.passing_marks),
+          status: data.status,
+          is_published: data.status === "published",
+          created_by: data.created_by,
+          created_at: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to update exam" };
+    }
+  },
+
+  async deleteExam(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+    try {
+      const { error } = await supabase.from("exams").delete().eq("id", id);
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete exam" };
+    }
+  },
+
   async getExamMarks(examId: string): Promise<{ data: ExamMark[]; error?: string }> {
     if (!isSupabaseConfigured || !supabase) return { data: [] };
 

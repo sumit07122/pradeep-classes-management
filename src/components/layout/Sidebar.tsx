@@ -19,6 +19,7 @@ import {
   X,
   ChevronDown,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { UserRole } from "../../types";
@@ -42,88 +43,100 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
+    label: "Platform Admin",
+    path: "/platform",
+    icon: ShieldCheck,
+    roles: ["super_admin"],
+  },
+  {
     label: "Overview",
     path: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["owner", "admin", "teacher"],
+    roles: ["super_admin", "owner", "admin", "teacher"],
   },
   {
     label: "Students",
     path: "/students",
     icon: Users,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Teachers",
     path: "/teachers",
     icon: GraduationCap,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Batches",
     path: "/batches",
     icon: BookOpen,
-    roles: ["owner", "admin", "teacher"],
+    roles: ["super_admin", "owner", "admin", "teacher"],
   },
   {
     label: "Attendance",
     path: "/attendance",
     icon: ClipboardCheck,
-    roles: ["owner", "admin", "teacher"],
+    roles: ["super_admin", "owner", "admin", "teacher"],
   },
   {
     label: "Fee Records",
     path: "/fees",
     icon: IndianRupee,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Finance & Analytics",
     path: "/finance",
     icon: TrendingUp,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Expense Ledger",
     path: "/finance/expenses",
     icon: Receipt,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Teacher Payroll",
     path: "/finance/payroll",
     icon: Briefcase,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Exams & Marks",
     path: "/academics",
     icon: CalendarDays,
-    roles: ["owner", "admin", "teacher"],
+    roles: ["super_admin", "owner", "admin", "teacher"],
+  },
+  {
+    label: "Class Diary & Syllabus",
+    path: "/diary",
+    icon: BookOpen,
+    roles: ["super_admin", "owner", "admin", "teacher", "student"],
   },
   {
     label: "Timetable",
     path: "/timetable",
     icon: Clock,
-    roles: ["owner", "admin", "teacher", "student"],
+    roles: ["super_admin", "owner", "admin", "teacher", "student"],
   },
   {
     label: "Study Materials",
     path: "/materials",
     icon: FolderDown,
-    roles: ["owner", "admin", "teacher", "student"],
+    roles: ["super_admin", "owner", "admin", "teacher", "student"],
   },
   {
     label: "Announcements",
     path: "/announcements",
     icon: Bell,
-    roles: ["owner", "admin", "teacher", "student"],
+    roles: ["super_admin", "owner", "admin", "teacher", "student"],
   },
   {
     label: "Reports",
     path: "/reports",
     icon: FileSpreadsheet,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin"],
   },
   {
     label: "Student Portal",
@@ -132,10 +145,10 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["student"],
   },
   {
-    label: "Settings",
+    label: "Settings & Profile",
     path: "/settings",
     icon: Settings,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "teacher", "student"],
   },
 ];
 
