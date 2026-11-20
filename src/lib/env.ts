@@ -1,6 +1,10 @@
+const DEFAULT_SUPABASE_URL = "https://gajibrwnccddnrbnhwmh.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhamlicnduY2NkZG5yYm5od21oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxNzQzMjUsImV4cCI6MjExMDc1MDMyNX0.bRIRMF6UZB6VbYaa9yZNO74-0RXMW_4vWnfLCotrrrw";
+
 export const env = {
-  supabaseUrl: (import.meta.env.VITE_SUPABASE_URL || "").trim(),
-  supabaseAnonKey: (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim(),
+  supabaseUrl: (import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim(),
+  supabaseAnonKey: (import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY).trim(),
   isDev: Boolean(import.meta.env.DEV),
   isProd: Boolean(import.meta.env.PROD),
   mode: import.meta.env.MODE || "development",
