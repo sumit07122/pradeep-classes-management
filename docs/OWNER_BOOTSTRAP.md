@@ -10,9 +10,11 @@ This document outlines the hardened procedure for bootstrapping the initial **In
    The `bootstrap_initial_owner` SQL function acquires a session transaction lock via `perform pg_advisory_xact_lock(hashtext('initial_owner_bootstrap_lock'))`. This guarantees that concurrent bootstrap requests are serialized and only a single owner can ever be created.
 2. **Name Preservation**:
    The function inspects `auth.users.raw_user_meta_data->>'full_name'` to preserve the user's authentic name rather than hardcoding placeholder strings.
-3. **Privilege Revocation**:
-   Execution privileges on `bootstrap_initial_owner` are revoked from `public`, `anon`, and `authenticated`. Only database superusers and service connections (Supabase SQL Editor or direct postgres CLI) can call it.
-4. **Trigger Enforcement on Subsequent Roles**:
+3. **Privilege Revocation & Trusted Execution Context**:
+   Execution privileges on `bootstrap_initial_owner` are revoked from `public`, `anon`, and `authenticated`. Only database superusers and trusted administrative connections (Supabase SQL Editor or direct postgres CLI / server-side service role) can call it. Frontend clients cannot execute this function.
+4. **Pre-Bootstrap Guard Against Untrusted Insertion**:
+   Untrusted authenticated users cannot insert a profile with `role = 'owner'` or `'admin'`, even before any owner exists in the database. The `trg_prevent_role_escalation` trigger blocks direct inserts unless the `institute.internal_bootstrap_in_progress` transaction setting is active, which is set exclusively inside `bootstrap_initial_owner()`. Normal user signups continue to receive the safe default `student` role via `handle_new_user()`.
+5. **Trigger Enforcement on Subsequent Roles**:
    `trg_prevent_role_escalation` ensures that once an owner exists, subsequent Owner or Admin role assignments can only be executed by an existing authenticated Owner.
 
 ---

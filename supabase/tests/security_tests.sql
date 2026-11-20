@@ -1,11 +1,10 @@
 -- ============================================================================
 -- Pradeep Classes Management: Security & Authorization Test Suite
 -- Target Database: PostgreSQL 15+ with Supabase RLS
--- Run in Supabase SQL Editor or via psql.
--- All tests run inside a transaction and ROLLBACK at the end to leave the DB clean.
+-- Pure SQL syntax: Fully compatible with Supabase SQL Editor and psql.
+-- All assertions run inside a transaction and conclude with ROLLBACK.
 -- ============================================================================
 
-\set ON_ERROR_STOP on
 begin;
 
 -- ----------------------------------------------------------------------------
@@ -22,6 +21,7 @@ create temp table test_fixtures as select
   '66666666-6666-4666-8666-666666666666'::uuid as student_2_uid,
   '77777777-7777-4777-8777-777777777777'::uuid as parent_1_uid,
   '88888888-8888-4888-8888-888888888888'::uuid as parent_2_uid,
+  '99999999-9999-4999-8999-999999999999'::uuid as untrusted_uid,
   gen_random_uuid() as batch_jee_id,
   gen_random_uuid() as batch_neet_id,
   gen_random_uuid() as teacher_a_rec_id,
@@ -30,20 +30,86 @@ create temp table test_fixtures as select
   gen_random_uuid() as student_2_rec_id;
 
 -- 1. Create simulated auth.users entries
-insert into auth.users (id, email)
-select owner_uid, 'test_owner@pradeepclasses.in' from test_fixtures union all
-select admin_uid, 'test_admin@pradeepclasses.in' from test_fixtures union all
-select teacher_a_uid, 'test_teacher_a@pradeepclasses.in' from test_fixtures union all
-select teacher_b_uid, 'test_teacher_b@pradeepclasses.in' from test_fixtures union all
-select student_1_uid, 'test_student_1@pradeepclasses.in' from test_fixtures union all
-select student_2_uid, 'test_student_2@pradeepclasses.in' from test_fixtures union all
-select parent_1_uid, 'test_parent_1@pradeepclasses.in' from test_fixtures union all
-select parent_2_uid, 'test_parent_2@pradeepclasses.in' from test_fixtures
+insert into auth.users (id, email, raw_user_meta_data)
+select owner_uid, 'test_owner@pradeepclasses.in', '{"full_name": "Authentic Owner Name"}'::jsonb from test_fixtures union all
+select admin_uid, 'test_admin@pradeepclasses.in', '{"full_name": "Admin Sharma"}'::jsonb from test_fixtures union all
+select teacher_a_uid, 'test_teacher_a@pradeepclasses.in', '{"full_name": "Teacher Amit"}'::jsonb from test_fixtures union all
+select teacher_b_uid, 'test_teacher_b@pradeepclasses.in', '{"full_name": "Teacher Neha"}'::jsonb from test_fixtures union all
+select student_1_uid, 'test_student_1@pradeepclasses.in', '{"full_name": "Aarav Sharma"}'::jsonb from test_fixtures union all
+select student_2_uid, 'test_student_2@pradeepclasses.in', '{"full_name": "Ananya Verma"}'::jsonb from test_fixtures union all
+select parent_1_uid, 'test_parent_1@pradeepclasses.in', '{"full_name": "Rajesh Sharma"}'::jsonb from test_fixtures union all
+select parent_2_uid, 'test_parent_2@pradeepclasses.in', '{"full_name": "Suresh Verma"}'::jsonb from test_fixtures union all
+select untrusted_uid, 'untrusted_attacker@random.com', '{"full_name": "Malicious User"}'::jsonb from test_fixtures
 on conflict (id) do nothing;
 
--- 2. Populate profiles with respective roles
+
+-- ----------------------------------------------------------------------------
+-- PRE-BOOTSTRAP TEST: Untrusted user attempts to directly insert Owner profile
+-- before any owner exists in the database.
+-- Expected: REJECTED by trg_prevent_role_escalation trigger.
+-- ----------------------------------------------------------------------------
+set local role authenticated;
+do $$
+declare
+  u_id uuid;
+begin
+  select untrusted_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "untrusted_attacker@random.com"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+end;
+$$;
+
+do $$
+declare
+  failed boolean := false;
+  f record;
+begin
+  select * into f from test_fixtures;
+  begin
+    -- Untrusted user attempts to self-appoint as Owner before any owner exists
+    insert into public.profiles (id, full_name, role)
+    values (f.untrusted_uid, 'Malicious User', 'owner');
+  exception when others then
+    failed := true;
+  end;
+
+  if not failed then
+    raise exception 'PRE-BOOTSTRAP TEST FAILED: Untrusted user was able to directly insert an Owner profile!';
+  end if;
+
+  raise notice 'PRE-BOOTSTRAP TEST PASSED: Direct privileged profile insertion blocked prior to owner existence.';
+end;
+$$;
+
+
+-- ----------------------------------------------------------------------------
+-- INITIAL OWNER BOOTSTRAP TEST (Authorized Context)
+-- Expected: Successfully provisions Owner preserving metadata name.
+-- ----------------------------------------------------------------------------
+reset role;
+do $$
+declare
+  result jsonb;
+  f record;
+begin
+  select * into f from test_fixtures;
+  result := public.bootstrap_initial_owner('test_owner@pradeepclasses.in');
+
+  if (result->>'status') != 'success' or (result->>'full_name') != 'Authentic Owner Name' then
+    raise exception 'BOOTSTRAP TEST FAILED: Initial owner bootstrap did not succeed or name was not preserved: %', result;
+  end if;
+
+  raise notice 'BOOTSTRAP TEST PASSED: Initial owner bootstrapped via authorized procedure preserving authentic name.';
+end;
+$$;
+
+
+-- ----------------------------------------------------------------------------
+-- FIXTURE POPULATION FOR SUBSEQUENT POLICY TESTS
+-- ----------------------------------------------------------------------------
+-- Populate remaining profiles
 insert into public.profiles (id, full_name, role)
-select owner_uid, 'Test Owner', 'owner'::public.app_role from test_fixtures union all
 select admin_uid, 'Test Admin', 'admin'::public.app_role from test_fixtures union all
 select teacher_a_uid, 'Teacher Amit (JEE)', 'teacher'::public.app_role from test_fixtures union all
 select teacher_b_uid, 'Teacher Neha (NEET)', 'teacher'::public.app_role from test_fixtures union all
@@ -53,37 +119,31 @@ select parent_1_uid, 'Rajesh Sharma (Parent 1)', 'parent'::public.app_role from 
 select parent_2_uid, 'Suresh Verma (Parent 2)', 'parent'::public.app_role from test_fixtures
 on conflict (id) do update set role = excluded.role;
 
--- 3. Populate Batches
+-- Batches
 insert into public.batches (id, name, course_name)
 select batch_jee_id, 'JEE Morning Advanced', 'Engineering' from test_fixtures union all
 select batch_neet_id, 'NEET Evening Medical', 'Medical' from test_fixtures;
 
--- 4. Populate Teachers & Batch Allocations
+-- Teachers & Assignments
 insert into public.teachers (id, profile_id, full_name, subject)
 select teacher_a_rec_id, teacher_a_uid, 'Teacher Amit', 'Physics' from test_fixtures union all
 select teacher_b_rec_id, teacher_b_uid, 'Teacher Neha', 'Chemistry' from test_fixtures;
 
--- Teacher Amit is assigned ONLY to JEE Morning
--- Teacher Neha is assigned ONLY to NEET Evening
 insert into public.teacher_batches (teacher_id, batch_id)
 select teacher_a_rec_id, batch_jee_id from test_fixtures union all
 select teacher_b_rec_id, batch_neet_id from test_fixtures;
 
--- 5. Populate Students
--- Student 1 is in JEE Morning
--- Student 2 is in NEET Evening
+-- Students with direct profile_id binding
 insert into public.students (id, admission_no, full_name, class_name, batch_id, profile_id, phone)
 select student_1_rec_id, 'TST-2026-001', 'Aarav Sharma', 'Class 12', batch_jee_id, student_1_uid, '9876543210' from test_fixtures union all
 select student_2_rec_id, 'TST-2026-002', 'Ananya Verma', 'Class 11', batch_neet_id, student_2_uid, '9876543211' from test_fixtures;
 
--- 6. Populate Parent-Student Links
--- Parent 1 is verified parent of Student 1 ONLY
--- Parent 2 is verified parent of Student 2 ONLY
+-- Verified Parent-Student Relationships
 insert into public.parent_students (parent_profile_id, student_id, relationship_type, is_verified)
 select parent_1_uid, student_1_rec_id, 'father', true from test_fixtures union all
 select parent_2_uid, student_2_rec_id, 'father', true from test_fixtures;
 
--- 7. Populate Fee Records
+-- Fee Records
 insert into public.fee_records (student_id, amount, status, due_date)
 select student_1_rec_id, 15000, 'paid', '2026-11-30' from test_fixtures union all
 select student_2_rec_id, 18000, 'pending', '2026-11-30' from test_fixtures;
@@ -94,7 +154,11 @@ select student_2_rec_id, 18000, 'pending', '2026-11-30' from test_fixtures;
 -- Expected: 0 rows accessible on protected tables
 -- ----------------------------------------------------------------------------
 set local role anon;
-set local request.jwt.claims to '{"role": "anon"}';
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"role": "anon"}', true);
+end;
+$$;
 
 do $$
 declare
@@ -117,8 +181,13 @@ $$;
 -- ----------------------------------------------------------------------------
 set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select owner_uid from test_fixtures)), true);
+  select owner_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_owner@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -141,9 +210,15 @@ $$;
 -- TEST 3: Admin Institute-Wide Access
 -- Expected: Can read all batches, all students
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select admin_uid from test_fixtures)), true);
+  select admin_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_admin@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -167,9 +242,15 @@ $$;
 -- Teacher Amit is assigned to JEE Morning only.
 -- Expected: Can read JEE batch and Student 1, but NOT NEET batch or Student 2.
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select teacher_a_uid from test_fixtures)), true);
+  select teacher_a_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_teacher_a@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -200,6 +281,7 @@ $$;
 -- TEST 5: Teacher Attendance Marking on Assigned Batch
 -- Expected: Successfully create attendance session and insert record for assigned student
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
 declare
   new_session_id uuid := gen_random_uuid();
@@ -224,6 +306,7 @@ $$;
 -- TEST 6: Teacher Attempt to Create Attendance for Unassigned Batch
 -- Expected: REJECTED by RLS policy
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
 declare
   f record;
@@ -250,6 +333,7 @@ $$;
 -- TEST 7: Teacher Attempt to Mark Student from Another Batch
 -- Expected: REJECTED by Attendance Integrity Trigger
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
 declare
   f record;
@@ -281,9 +365,15 @@ $$;
 -- Student 1 (Aarav) logs in.
 -- Expected: Can read ONLY own student record, own attendance, and own fee record.
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select student_1_uid from test_fixtures)), true);
+  select student_1_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_student_1@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -312,9 +402,15 @@ $$;
 -- Parent 1 (Rajesh) logs in.
 -- Expected: Can read Student 1 (Aarav), Student 1 attendance, and Student 1 fees.
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select parent_1_uid from test_fixtures)), true);
+  select parent_1_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_parent_1@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -341,9 +437,15 @@ $$;
 -- Student 1 attempts to promote themselves to 'owner'.
 -- Expected: REJECTED by trg_prevent_role_escalation.
 -- ----------------------------------------------------------------------------
+set local role authenticated;
 do $$
+declare
+  u_id uuid;
 begin
-  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated"}', (select student_1_uid from test_fixtures)), true);
+  select student_1_uid into u_id from test_fixtures;
+  perform set_config('request.jwt.claims', format('{"sub": "%s", "role": "authenticated", "email": "test_student_1@pradeepclasses.in"}', u_id), true);
+  perform set_config('request.jwt.claim.sub', u_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
 end;
 $$;
 
@@ -385,10 +487,9 @@ begin
     raise exception 'TEST 11 FAILED: Secondary call to bootstrap_initial_owner succeeded despite existing owner!';
   end if;
 
-  raise notice 'TEST 11 PASSED: Secondary owner bootstrap call successfully blocked by advisory check.';
+  raise notice 'TEST 11 PASSED: Secondary owner bootstrap call successfully blocked by advisory lock & count check.';
 end;
 $$;
 
 -- Rollback entire fixture transaction to leave database clean
 rollback;
-raise notice 'ALL 11 SECURITY ASSERTIONS PASSED. TRANSACTION ROLLED BACK CLEANLY.';

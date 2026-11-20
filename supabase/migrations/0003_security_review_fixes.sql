@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Migration 0003: Corrective Security Review Fixes
 -- Safe to apply sequentially after 0001_initial_schema.sql & 0002_enhanced_rls...
+-- Pure SQL syntax: Fully compatible with Supabase SQL Editor and psql
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -11,27 +12,53 @@
 
 -- Batches
 drop policy if exists "batches_staff_read" on public.batches;
+drop policy if exists "batches_teacher_read" on public.batches;
+drop policy if exists "batches_student_read" on public.batches;
+drop policy if exists "batches_parent_read" on public.batches;
 
 -- Students
 drop policy if exists "students_staff_read" on public.students;
 drop policy if exists "students_self_read" on public.students;
+drop policy if exists "students_teacher_read" on public.students;
+drop policy if exists "students_parent_read" on public.students;
 
 -- Teachers & Assignments
 drop policy if exists "teachers_staff_read" on public.teachers;
+drop policy if exists "teachers_student_parent_read" on public.teachers;
 drop policy if exists "teacher_batches_staff_read" on public.teacher_batches;
+drop policy if exists "teacher_batches_teacher_read" on public.teacher_batches;
 
 -- Attendance Sessions
 drop policy if exists "attendance_staff_read" on public.attendance_sessions;
 drop policy if exists "attendance_teacher_insert" on public.attendance_sessions;
+drop policy if exists "attendance_admin_update" on public.attendance_sessions;
+drop policy if exists "attendance_sessions_admin_all" on public.attendance_sessions;
+drop policy if exists "attendance_sessions_teacher_read" on public.attendance_sessions;
+drop policy if exists "attendance_sessions_teacher_insert" on public.attendance_sessions;
+drop policy if exists "attendance_sessions_student_read" on public.attendance_sessions;
+drop policy if exists "attendance_sessions_parent_read" on public.attendance_sessions;
 
 -- Attendance Records
 drop policy if exists "attendance_records_staff_read" on public.attendance_records;
 drop policy if exists "attendance_records_student_read" on public.attendance_records;
 drop policy if exists "attendance_teacher_insert_records" on public.attendance_records;
+drop policy if exists "attendance_records_admin_update" on public.attendance_records;
+drop policy if exists "attendance_records_admin_all" on public.attendance_records;
+drop policy if exists "attendance_records_teacher_read" on public.attendance_records;
+drop policy if exists "attendance_records_teacher_insert" on public.attendance_records;
+drop policy if exists "attendance_records_parent_read" on public.attendance_records;
+
+-- Parent-Student Links
+drop policy if exists "parent_students_admin_all" on public.parent_students;
+drop policy if exists "parent_students_parent_read" on public.parent_students;
+drop policy if exists "parent_students_student_read" on public.parent_students;
 
 -- Fee Records & Structures
 drop policy if exists "fee_structures_staff_read" on public.fee_structures;
+drop policy if exists "fee_structures_read" on public.fee_structures;
 drop policy if exists "fee_records_student_self_read" on public.fee_records;
+drop policy if exists "fee_records_student_read" on public.fee_records;
+drop policy if exists "fee_records_parent_read" on public.fee_records;
 
 
 -- ----------------------------------------------------------------------------
@@ -186,6 +213,11 @@ create policy "teacher_batches_teacher_read" on public.teacher_batches
 -- ----------------------------------------------------------------------------
 
 -- Attendance Sessions:
+-- Admin & Owner full CRUD
+create policy "attendance_sessions_admin_all" on public.attendance_sessions
+  for all using (public.current_user_role() in ('owner', 'admin'))
+  with check (public.current_user_role() in ('owner', 'admin'));
+
 -- Teacher: Read only assigned batch sessions
 create policy "attendance_sessions_teacher_read" on public.attendance_sessions
   for select using (
@@ -226,10 +258,14 @@ create policy "attendance_sessions_parent_read" on public.attendance_sessions
   );
 
 -- NOTE: No UPDATE or DELETE policy is granted to teachers on attendance_sessions.
--- Owner/Admin retain update via `attendance_admin_update`.
 
 
 -- Attendance Records:
+-- Admin & Owner full CRUD
+create policy "attendance_records_admin_all" on public.attendance_records
+  for all using (public.current_user_role() in ('owner', 'admin'))
+  with check (public.current_user_role() in ('owner', 'admin'));
+
 -- Teacher: Read only records for assigned batch sessions
 create policy "attendance_records_teacher_read" on public.attendance_records
   for select using (
@@ -378,7 +414,7 @@ create policy "fee_records_parent_read" on public.fee_records
 
 
 -- ----------------------------------------------------------------------------
--- 9. HARDEN OWNER BOOTSTRAP & PRIVILEGED ROLE ASSIGNMENT
+-- 9. HARDEN OWNER BOOTSTRAP TRUST BOUNDARY & ANTI-ESCALATION
 -- ----------------------------------------------------------------------------
 
 -- Single-use, concurrency-locked owner bootstrap
@@ -394,7 +430,7 @@ begin
   -- 1. Acquire transaction advisory lock to serialize concurrent executions
   perform pg_advisory_xact_lock(hashtext('initial_owner_bootstrap_lock'));
 
-  -- 2. Verify that NO owner exists
+  -- 2. Verify that NO owner exists anywhere in profiles
   select count(*) into existing_owner_count from public.profiles where role = 'owner';
   if existing_owner_count > 0 then
     raise exception 'Bootstrap aborted: An institute owner already exists. Contact existing owner to assign administrative privileges.';
@@ -409,14 +445,17 @@ begin
     raise exception 'Bootstrap aborted: No authenticated user found with email %.', owner_email;
   end if;
 
-  -- 4. Upsert profile with owner role preserving actual name
+  -- 4. Mark transaction-local context for bootstrap authorization
+  perform set_config('institute.internal_bootstrap_in_progress', 'true', true);
+
+  -- 5. Upsert profile with owner role preserving actual name
   insert into public.profiles (id, full_name, role)
   values (target_user_id, user_full_name, 'owner')
   on conflict (id) do update set
     role = 'owner',
     full_name = coalesce(public.profiles.full_name, user_full_name);
 
-  -- 5. Audit log entry
+  -- 6. Audit log entry
   insert into public.audit_logs (actor_id, action, table_name, record_id, after_data)
   values (
     target_user_id,
@@ -440,30 +479,47 @@ $$;
 revoke all on function public.bootstrap_initial_owner(text) from public, anon, authenticated;
 
 -- Hardened role escalation prevention trigger
+-- Strictly ensures that:
+-- 1. Initial Owner can ONLY be created via bootstrap_initial_owner().
+-- 2. Direct inserts of Owner or Admin by untrusted users (even before any owner exists) are REJECTED.
+-- 3. Normal signup with default role 'student' continues working as expected.
+-- 4. Subsequent role updates or promotions to Owner or Admin require an existing Owner.
 create or replace function public.prevent_self_role_escalation()
 returns trigger language plpgsql security definer
 set search_path = public
 as $$
 declare
   calling_user_role public.app_role;
+  is_bootstrap_active boolean;
 begin
-  -- On insert of an owner or admin: must be either bootstrap or called by an existing Owner
+  -- Check if bootstrap function is executing
+  is_bootstrap_active := coalesce(current_setting('institute.internal_bootstrap_in_progress', true), 'false') = 'true';
+
+  -- On insert of an owner or admin profile:
   if (TG_OP = 'INSERT') then
     if (new.role in ('owner', 'admin')) then
-      -- If an owner already exists, caller must be owner
-      if exists (select 1 from public.profiles where role = 'owner') then
-        calling_user_role := public.current_user_role();
-        if (calling_user_role is null or calling_user_role != 'owner') then
-          raise exception 'Unauthorized role assignment: Only an institute Owner can assign Owner or Admin roles.';
-        end if;
+      -- If inside authorized bootstrap, allow initial owner creation
+      if is_bootstrap_active then
+        return new;
+      end if;
+
+      -- Otherwise, privileged role insertion MUST be performed by an existing Owner
+      calling_user_role := public.current_user_role();
+      if (calling_user_role is null or calling_user_role != 'owner') then
+        raise exception 'Unauthorized role assignment: Privileged roles (owner, admin) cannot be directly inserted. The initial owner must be provisioned exclusively via bootstrap_initial_owner().';
       end if;
     end if;
     return new;
   end if;
 
-  -- On update: prevent changing role unless caller is owner
+  -- On update: prevent changing role unless caller is an existing Owner
   if (TG_OP = 'UPDATE') then
     if (old.role != new.role) then
+      -- If inside authorized bootstrap, allow
+      if is_bootstrap_active then
+        return new;
+      end if;
+
       calling_user_role := public.current_user_role();
       if (calling_user_role is null or calling_user_role != 'owner') then
         raise exception 'Unauthorized role change: Only an institute Owner can modify user roles.';
