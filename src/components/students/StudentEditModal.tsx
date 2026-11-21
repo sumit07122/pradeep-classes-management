@@ -24,7 +24,7 @@ export const StudentEditModal: React.FC<StudentEditModalProps> = ({
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("Kota");
+  const [city, setCity] = useState("Mathura");
   const [className, setClassName] = useState(CLASSES[0]);
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
@@ -45,7 +45,7 @@ export const StudentEditModal: React.FC<StudentEditModalProps> = ({
       setDateOfBirth(student.date_of_birth || "");
       setGender(student.gender || "male");
       setAddress(student.address || "");
-      setCity(student.city || "Kota");
+      setCity(student.city || "Mathura");
       setClassName(student.class_name);
       setParentName(student.parent_name || "");
       setParentPhone(student.parent_phone || "");
@@ -77,7 +77,7 @@ export const StudentEditModal: React.FC<StudentEditModalProps> = ({
       date_of_birth: dateOfBirth || undefined,
       gender,
       address: address.trim() || undefined,
-      city: city.trim() || "Kota",
+      city: city.trim() || "Mathura",
       class_name: className,
       parent_name: parentName.trim() || undefined,
       parent_phone: parentPhone.trim() || undefined,

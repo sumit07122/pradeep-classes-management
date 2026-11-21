@@ -9,6 +9,7 @@ interface RollCallTableProps {
   onStatusChange: (studentId: string, status: AttendanceStatus) => void;
   onNoteChange: (studentId: string, note: string) => void;
   onBulkStatusChange: (status: AttendanceStatus) => void;
+  onNotifyStudent?: (student: RollCallStudent) => void;
   readOnly?: boolean;
 }
 
@@ -18,6 +19,7 @@ export const RollCallTable: React.FC<RollCallTableProps> = ({
   onStatusChange,
   onNoteChange,
   onBulkStatusChange,
+  onNotifyStudent,
   readOnly = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,6 +214,17 @@ export const RollCallTable: React.FC<RollCallTableProps> = ({
                           >
                             <MessageSquare size={13} />
                           </button>
+
+                          {onNotifyStudent && (
+                            <button
+                              type="button"
+                              title={`Send WhatsApp Alert (${s.status.toUpperCase()})`}
+                              onClick={() => onNotifyStudent(s)}
+                              className="w-7 h-7 rounded-md text-xs transition-colors flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700"
+                            >
+                              <MessageSquare size={13} className="text-emerald-600" />
+                            </button>
+                          )}
                         </div>
                       )}
 

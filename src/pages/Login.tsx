@@ -46,9 +46,11 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-[#f4b942] text-[#123251] rounded-2xl mx-auto flex items-center justify-center font-extrabold text-2xl font-['Manrope'] shadow-md mb-3">
-            PC
-          </div>
+          <img
+            src="/logo.png"
+            alt="Pradeep Classes"
+            className="w-20 h-20 object-contain mx-auto mb-3 bg-white rounded-2xl p-1 shadow-md border border-slate-200"
+          />
           <h1 className="text-2xl font-extrabold text-[#102f50] font-['Manrope'] tracking-tight">
             Pradeep Classes
           </h1>

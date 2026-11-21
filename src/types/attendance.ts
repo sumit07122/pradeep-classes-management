@@ -29,6 +29,10 @@ export interface RollCallStudent {
   status: AttendanceStatus;
   note?: string;
   record_id?: string;
+  phone?: string;
+  parent_name?: string;
+  parent_phone?: string;
+  parent_relation?: string;
 }
 
 export interface AttendanceSummary {

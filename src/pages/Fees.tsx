@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Download, RefreshCw } from "lucide-react";
+import { Plus, Download, RefreshCw, MessageSquare } from "lucide-react";
 import { Button, AlertNotice, LoadingSpinner, EmptyState } from "../components/common";
 import {
   FeeStatsSummary,
@@ -9,6 +9,7 @@ import {
   PrintableReceiptModal,
   PaymentHistoryModal,
 } from "../components/fees";
+import { WhatsAppNotificationModal, type NotificationTarget } from "../components/whatsapp/WhatsAppNotificationModal";
 import { feesService } from "../services/feesService";
 import { useAuth } from "../hooks/useAuth";
 import type { FeeRecord, FeeSummary, FeeStatus } from "../types/fees";
@@ -37,6 +38,51 @@ export const Fees: React.FC = () => {
   const [collectRecord, setCollectRecord] = useState<FeeRecord | null>(null);
   const [historyRecord, setHistoryRecord] = useState<FeeRecord | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
+  const [whatsappModalData, setWhatsappModalData] = useState<{
+    isOpen: boolean;
+    targets: NotificationTarget[];
+  }>({
+    isOpen: false,
+    targets: [],
+  });
+
+  const handleSendSingleFeeReminder = (record: FeeRecord) => {
+    setWhatsappModalData({
+      isOpen: true,
+      targets: [
+        {
+          student_id: record.student_id,
+          student_name: record.student_name || "Student",
+          batch_name: record.batch_name,
+          amount_due: record.balance_due,
+          fee_title: record.title,
+          phone: record.student_phone,
+          parent_name: record.parent_name,
+          parent_phone: record.parent_phone,
+          record_id: record.id,
+        },
+      ],
+    });
+  };
+
+  const handleSendBulkFeeReminders = () => {
+    const pendingRecords = records.filter((r) => r.balance_due > 0);
+    if (pendingRecords.length === 0) return;
+    setWhatsappModalData({
+      isOpen: true,
+      targets: pendingRecords.map((r) => ({
+        student_id: r.student_id,
+        student_name: r.student_name || "Student",
+        batch_name: r.batch_name,
+        amount_due: r.balance_due,
+        fee_title: r.title,
+        phone: r.student_phone,
+        parent_name: r.parent_name,
+        parent_phone: r.parent_phone,
+        record_id: r.id,
+      })),
+    });
+  };
 
   useEffect(() => {
     loadFeesData();
@@ -133,6 +179,17 @@ export const Fees: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {canManageFees && records.some((r) => r.balance_due > 0) && (
+            <Button
+              variant="outline"
+              onClick={handleSendBulkFeeReminders}
+              icon={<MessageSquare size={14} className="text-emerald-600" />}
+              className="border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            >
+              Remind Pending
+            </Button>
+          )}
+
           <Button
             variant="outline"
             onClick={loadFeesData}
@@ -189,6 +246,7 @@ export const Fees: React.FC = () => {
           onCollectPayment={(rec) => setCollectRecord(rec)}
           onViewReceipt={handleViewReceipt}
           onViewHistory={(rec) => setHistoryRecord(rec)}
+          onSendWhatsAppReminder={handleSendSingleFeeReminder}
           canManageFees={canManageFees}
         />
       )}
@@ -224,6 +282,20 @@ export const Fees: React.FC = () => {
         isOpen={Boolean(activeReceipt)}
         onClose={() => setActiveReceipt(null)}
         receipt={activeReceipt}
+      />
+
+      {/* WhatsApp One-Click Fee Reminder Modal */}
+      <WhatsAppNotificationModal
+        isOpen={whatsappModalData.isOpen}
+        onClose={() => setWhatsappModalData((prev) => ({ ...prev, isOpen: false }))}
+        type="fee_reminder"
+        targets={whatsappModalData.targets}
+        onSuccess={(count) => {
+          setNotice({
+            type: "success",
+            message: `${count} WhatsApp fee reminder(s) queued for dispatch.`,
+          });
+        }}
       />
     </div>
   );

@@ -502,7 +502,7 @@ export const Timetable: React.FC = () => {
                 type="submit"
                 variant="primary"
                 isLoading={isSubmitting}
-                disabled={Boolean(liveConflict)}
+                disabled={Boolean(liveConflict) || !formData.subject.trim() || formData.start_time >= formData.end_time}
               >
                 {editingId ? "Save Changes" : "Confirm & Schedule"}
               </Button>

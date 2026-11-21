@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Menu, CalendarDays, Bell, LogOut } from "lucide-react";
 import type { UserRole } from "../../types";
+import { NotificationDrawer } from "./NotificationDrawer";
 
 export interface TopbarProps {
   onOpenMobileNav: () => void;
@@ -17,6 +18,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   userName = "Administrator",
   onSignOut,
 }) => {
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
   const todayFormatted = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
     day: "numeric",
@@ -53,10 +56,21 @@ export const Topbar: React.FC<TopbarProps> = ({
           <span>{todayFormatted}</span>
         </div>
 
-        <button className="icon-button notification" aria-label="Notifications">
+        <button
+          className="icon-button notification"
+          aria-label="Notifications"
+          onClick={() => setIsNotificationsOpen(true)}
+          title="Open Notifications & Announcements"
+        >
           <Bell size={18} />
           <i />
         </button>
+
+        <NotificationDrawer
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          userRole={userRole}
+        />
 
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
           <span

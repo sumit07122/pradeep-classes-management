@@ -102,4 +102,149 @@ export const whatsappService = {
       return { success: false, error: err.message || "Retry failed" };
     }
   },
+
+  /**
+   * Check if a duplicate notification was already queued/sent today
+   */
+  async checkDuplicateNotification(
+    studentId: string,
+    eventType: string,
+    referenceId?: string
+  ): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      let query = supabase
+        .from("whatsapp_message_queue")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("event_type", eventType)
+        .gte("created_at", `${today}T00:00:00Z`);
+
+      if (referenceId) {
+        query = query.eq("reference_id", referenceId);
+      }
+
+      const { data } = await query.limit(1);
+      return Boolean(data && data.length > 0);
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Queue bulk absent notifications
+   */
+  async sendBulkAbsentAlerts(
+    items: {
+      student_id: string;
+      student_name: string;
+      batch_name: string;
+      date: string;
+      recipient_phone?: string;
+      recipient_name?: string;
+      recipient_type?: string;
+      reference_id?: string;
+      message_body: string;
+      initiated_by?: string;
+    }[]
+  ): Promise<{ queuedCount: number; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { queuedCount: 0, error: "Database not configured" };
+
+    try {
+      const { data: settings } = await this.getSettings();
+      const isLive = Boolean(settings?.is_enabled && settings?.phone_number_id && settings?.api_token);
+      const queueStatus = isLive ? "pending" : "skipped_test_mode";
+
+      const rows = items.map((item) => ({
+        institute_id: "11111111-2222-3333-4444-555555555555",
+        student_id: item.student_id,
+        recipient_phone: item.recipient_phone?.trim() || "0000000000",
+        recipient_name: item.recipient_name?.trim() || item.student_name,
+        event_type: "attendance_absent",
+        template_name: "attendance_absent",
+        message_body: item.message_body,
+        parameters: {
+          student_name: item.student_name,
+          batch_name: item.batch_name,
+          date: item.date,
+          recipient_type: item.recipient_type || "parent",
+          initiated_by: item.initiated_by,
+        },
+        status: queueStatus,
+        attempts: 0,
+        max_attempts: 3,
+        error_message: isLive ? null : "Simulated in test mode (WhatsApp credentials not set).",
+        reference_id: item.reference_id || null,
+      }));
+
+      const { data, error } = await supabase.from("whatsapp_message_queue").insert(rows).select("id");
+      if (error) throw error;
+
+      return { queuedCount: data?.length || 0 };
+    } catch (err: any) {
+      return { queuedCount: 0, error: err.message || "Failed to queue absent alerts" };
+    }
+  },
+
+  /**
+   * Queue bulk fee reminders
+   */
+  async sendBulkFeeReminders(
+    items: {
+      student_id: string;
+      student_name: string;
+      amount_due: number;
+      fee_title: string;
+      recipient_phone?: string;
+      recipient_name?: string;
+      recipient_type?: string;
+      reference_id?: string;
+      message_body: string;
+      initiated_by?: string;
+    }[]
+  ): Promise<{ queuedCount: number; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { queuedCount: 0, error: "Database not configured" };
+
+    try {
+      const { data: settings } = await this.getSettings();
+      const isLive = Boolean(settings?.is_enabled && settings?.phone_number_id && settings?.api_token);
+      const queueStatus = isLive ? "pending" : "skipped_test_mode";
+
+      // Filter out any target whose amount_due is <= 0
+      const eligible = items.filter((i) => i.amount_due > 0);
+      if (eligible.length === 0) {
+        return { queuedCount: 0, error: "No eligible invoices with positive balance due found." };
+      }
+
+      const rows = eligible.map((item) => ({
+        institute_id: "11111111-2222-3333-4444-555555555555",
+        student_id: item.student_id,
+        recipient_phone: item.recipient_phone?.trim() || "0000000000",
+        recipient_name: item.recipient_name?.trim() || item.student_name,
+        event_type: "fee_due_reminder",
+        template_name: "fee_due_reminder",
+        message_body: item.message_body,
+        parameters: {
+          student_name: item.student_name,
+          amount_due: item.amount_due,
+          fee_title: item.fee_title,
+          recipient_type: item.recipient_type || "parent",
+          initiated_by: item.initiated_by,
+        },
+        status: queueStatus,
+        attempts: 0,
+        max_attempts: 3,
+        error_message: isLive ? null : "Simulated in test mode (WhatsApp credentials not set).",
+        reference_id: item.reference_id || null,
+      }));
+
+      const { data, error } = await supabase.from("whatsapp_message_queue").insert(rows).select("id");
+      if (error) throw error;
+
+      return { queuedCount: data?.length || 0 };
+    } catch (err: any) {
+      return { queuedCount: 0, error: err.message || "Failed to queue fee reminders" };
+    }
+  },
 };

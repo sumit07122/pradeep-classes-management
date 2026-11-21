@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, IndianRupee, FileText, CheckCircle2 } from 'lucide-react';
+import { Search, IndianRupee, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Badge, Button } from '../common';
 import type { FeeRecord, FeeStatus } from '../../types/fees';
 
@@ -12,6 +12,7 @@ interface FeeRecordTableProps {
   onCollectPayment: (record: FeeRecord) => void;
   onViewReceipt: (record: FeeRecord) => void;
   onViewHistory?: (record: FeeRecord) => void;
+  onSendWhatsAppReminder?: (record: FeeRecord) => void;
   canManageFees: boolean;
 }
 
@@ -24,6 +25,7 @@ export const FeeRecordTable: React.FC<FeeRecordTableProps> = ({
   onCollectPayment,
   onViewReceipt,
   onViewHistory,
+  onSendWhatsAppReminder,
   canManageFees,
 }) => {
   const filterTabs: { label: string; value: FeeStatus | 'all' }[] = [
@@ -186,6 +188,17 @@ export const FeeRecordTable: React.FC<FeeRecordTableProps> = ({
                           >
                             Receipt
                           </Button>
+                        )}
+
+                        {canManageFees && !isSettled && onSendWhatsAppReminder && (
+                          <button
+                            type="button"
+                            onClick={() => onSendWhatsAppReminder(r)}
+                            className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition rounded"
+                            title="Send WhatsApp Fee Reminder"
+                          >
+                            <MessageSquare size={13} />
+                          </button>
                         )}
 
                         {canManageFees && !isSettled && (

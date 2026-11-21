@@ -180,7 +180,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div>
         {/* Brand */}
         <div className="brand">
-          <div className="brand-mark">PC</div>
+          <img
+            src="/logo.png"
+            alt="Pradeep Classes"
+            className="w-10 h-10 object-contain rounded-xl bg-white p-0.5 shadow-sm border border-slate-200 shrink-0"
+          />
           <div>
             <strong>Pradeep Classes</strong>
             <span>INSTITUTE MANAGEMENT</span>
@@ -196,10 +200,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Institute Workspace Switcher */}
         <div className="institute-switch">
-          <div className="institute-avatar">P</div>
+          <img
+            src="/logo.png"
+            alt="PC"
+            className="w-8 h-8 object-contain rounded-lg bg-white p-0.5 shrink-0"
+          />
           <div className="overflow-hidden">
             <b>Pradeep Classes</b>
-            <small className="truncate">Kota Coaching Campus</small>
           </div>
           <ChevronDown size={15} />
         </div>

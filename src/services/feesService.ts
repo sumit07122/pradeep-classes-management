@@ -46,6 +46,9 @@ export const feesService = {
             id,
             full_name,
             admission_no,
+            phone,
+            parent_name,
+            parent_phone,
             batches (
               id,
               name

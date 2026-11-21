@@ -26,7 +26,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("Kota");
+  const [city, setCity] = useState("Mathura");
 
   // Academic & Batch
   const [className, setClassName] = useState(CLASSES[0]);
@@ -67,7 +67,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
     setDateOfBirth("");
     setGender("male");
     setAddress("");
-    setCity("Kota");
+    setCity("Mathura");
     setClassName(CLASSES[0]);
     setParentName("");
     setParentPhone("");
@@ -101,7 +101,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
       date_of_birth: dateOfBirth || undefined,
       gender,
       address: address.trim() || undefined,
-      city: city.trim() || "Kota",
+      city: city.trim() || "Mathura",
       class_name: className,
       batch_id: selectedBatchId || undefined,
       batch_name: chosenBatch?.name || undefined,
@@ -213,7 +213,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
                 label="City"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Kota"
+                placeholder="Mathura"
               />
             </div>
           </div>

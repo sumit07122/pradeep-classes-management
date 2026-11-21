@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Phone, Download, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Phone, Download, RefreshCw, MessageSquare } from 'lucide-react';
 import { Modal, Button, LoadingSpinner } from '../common';
 import { attendanceService } from '../../services/attendanceService';
 import type { BatchDefaulter } from '../../types';
@@ -149,13 +149,24 @@ export const AttendanceDefaultersModal: React.FC<AttendanceDefaultersModalProps>
                     </td>
                     <td className="py-2 px-3">
                       {d.parent_phone ? (
-                        <a
-                          href={`tel:${d.parent_phone}`}
-                          className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline"
-                        >
-                          <Phone size={11} />
-                          {d.parent_phone}
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`tel:${d.parent_phone}`}
+                            className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:underline"
+                          >
+                            <Phone size={11} />
+                            {d.parent_phone}
+                          </a>
+                          <a
+                            href={`https://wa.me/${d.parent_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dear Parent, this is an official attendance notice from Pradeep Classes. ${d.full_name}'s attendance rate in ${batchName} is currently ${d.attendance_percentage}%, which is below the mandatory 75% requirement. Please contact the institute office.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition"
+                            title="Direct WhatsApp Alert"
+                          >
+                            <MessageSquare size={13} />
+                          </a>
+                        </div>
                       ) : (
                         <span className="text-slate-400 italic">Not recorded</span>
                       )}

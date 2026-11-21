@@ -6,9 +6,11 @@ import {
   AlertTriangle,
   Users,
   CheckCircle2,
+  MessageSquare,
 } from "lucide-react";
 import { Button, AlertNotice, LoadingSpinner, EmptyState } from "../components/common";
 import { AttendanceStats, RollCallTable, AttendanceDefaultersModal } from "../components/attendance";
+import { WhatsAppNotificationModal, type NotificationTarget } from "../components/whatsapp/WhatsAppNotificationModal";
 import { batchesService } from "../services/batchesService";
 import { attendanceService } from "../services/attendanceService";
 import { useAuth } from "../hooks/useAuth";
@@ -62,6 +64,15 @@ export const Attendance: React.FC = () => {
   const [notice, setNotice] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDefaultersOpen, setIsDefaultersOpen] = useState(false);
+  const [whatsappModalData, setWhatsappModalData] = useState<{
+    isOpen: boolean;
+    type: "absent_alert";
+    targets: NotificationTarget[];
+  }>({
+    isOpen: false,
+    type: "absent_alert",
+    targets: [],
+  });
 
   // 1. Load Batches
   useEffect(() => {
@@ -197,6 +208,44 @@ export const Attendance: React.FC = () => {
     }
   };
 
+  const handleNotifySingleStudent = (s: RollCallStudent) => {
+    setWhatsappModalData({
+      isOpen: true,
+      type: "absent_alert",
+      targets: [
+        {
+          student_id: s.student_id,
+          student_name: s.full_name,
+          batch_name: currentBatch?.name,
+          date: sessionDate,
+          phone: s.phone,
+          parent_name: s.parent_name,
+          parent_phone: s.parent_phone,
+          parent_relation: s.parent_relation,
+        },
+      ],
+    });
+  };
+
+  const handleNotifyAllAbsent = () => {
+    const absentStudents = students.filter((s) => s.status === "absent");
+    if (absentStudents.length === 0) return;
+    setWhatsappModalData({
+      isOpen: true,
+      type: "absent_alert",
+      targets: absentStudents.map((s) => ({
+        student_id: s.student_id,
+        student_name: s.full_name,
+        batch_name: currentBatch?.name,
+        date: sessionDate,
+        phone: s.phone,
+        parent_name: s.parent_name,
+        parent_phone: s.parent_phone,
+        parent_relation: s.parent_relation,
+      })),
+    });
+  };
+
   // 5. CSV Export
   const handleExportCsv = () => {
     const currentBatch = batches.find((b) => b.id === selectedBatchId);
@@ -232,6 +281,17 @@ export const Attendance: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedBatchId && summary.absent_count > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleNotifyAllAbsent}
+              icon={<MessageSquare size={15} className="text-emerald-600" />}
+              className="border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            >
+              Notify Absent ({summary.absent_count})
+            </Button>
+          )}
+
           {selectedBatchId && students.length > 0 && (
             <Button
               variant="outline"
@@ -379,6 +439,7 @@ export const Attendance: React.FC = () => {
           onStatusChange={handleStatusChange}
           onNoteChange={handleNoteChange}
           onBulkStatusChange={handleBulkStatusChange}
+          onNotifyStudent={handleNotifySingleStudent}
         />
       )}
 
@@ -391,6 +452,20 @@ export const Attendance: React.FC = () => {
           batchName={currentBatch?.name || "Batch"}
         />
       )}
+
+      {/* WhatsApp One-Click Notification Modal */}
+      <WhatsAppNotificationModal
+        isOpen={whatsappModalData.isOpen}
+        onClose={() => setWhatsappModalData((prev) => ({ ...prev, isOpen: false }))}
+        type={whatsappModalData.type}
+        targets={whatsappModalData.targets}
+        onSuccess={(count) => {
+          setNotice({
+            type: "success",
+            message: `${count} WhatsApp notification(s) successfully queued for dispatch.`,
+          });
+        }}
+      />
     </div>
   );
 };

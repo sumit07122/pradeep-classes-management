@@ -29,7 +29,7 @@ export const attendanceService = {
     // 1. Fetch all active students enrolled in this batch
     const { data: studentsData, error: studentsErr } = await supabase
       .from('students')
-      .select('id, full_name, admission_no, roll_no, status')
+      .select('id, full_name, admission_no, roll_no, status, phone, parent_name, parent_phone, parent_relation')
       .eq('batch_id', batchId)
       .eq('status', 'active')
       .order('full_name', { ascending: true });
@@ -114,6 +114,10 @@ export const attendanceService = {
         status,
         note,
         record_id: existing?.id,
+        phone: (s as any).phone || undefined,
+        parent_name: (s as any).parent_name || undefined,
+        parent_phone: (s as any).parent_phone || undefined,
+        parent_relation: (s as any).parent_relation || undefined,
       };
     });
 

@@ -369,7 +369,7 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                         <div>
                           <span className="text-slate-400 text-[10px] block">Address</span>
                           <span className="font-semibold text-slate-800">
-                            {student.address}, {student.city || "Kota"}
+                            {student.address}, {student.city || "Mathura"}
                           </span>
                         </div>
                       </div>

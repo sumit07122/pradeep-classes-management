@@ -34,6 +34,9 @@ export interface FeeRecord {
   student_name?: string;
   admission_no?: string;
   batch_name?: string;
+  student_phone?: string;
+  parent_name?: string;
+  parent_phone?: string;
   title: string;
   amount: number;
   paid_amount: number;
