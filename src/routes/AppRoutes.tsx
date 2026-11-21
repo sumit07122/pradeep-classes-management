@@ -28,14 +28,13 @@ import { ClassDiary } from "../pages/ClassDiary";
 import { PlatformAdmin } from "../pages/PlatformAdmin";
 
 export const AppRoutes: React.FC = () => {
-  const { role, user, signOut, setDevRole, isDemoMode } = useAuth();
+  const { role, user, signOut, setDevRole } = useAuth();
 
   const wrapWithShell = (title: string, component: React.ReactNode) => (
     <AppShell
       pageTitle={title}
       userRole={role}
       userName={user?.full_name || "Institute User"}
-      isDemoMode={isDemoMode}
       onSignOut={signOut}
       onDevRoleChange={setDevRole}
     >

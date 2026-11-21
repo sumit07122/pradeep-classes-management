@@ -1,37 +1,10 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { batches as demoBatchNames } from "../data/demo";
 import type { Batch, Student } from "../types";
 
 export const batchesService = {
   async getBatches(): Promise<{ data: Batch[]; error?: string; isDemo: boolean }> {
     if (!isSupabaseConfigured || !supabase) {
-      const demoBatches: Batch[] = demoBatchNames.map((name, i) => {
-        const studentCount = [42, 36, 28, 21][i] || 25;
-        const maxCapacity = 40;
-        return {
-          id: `demo-batch-${i + 1}`,
-          name,
-          course_name: name.includes("JEE")
-            ? "JEE Advanced"
-            : name.includes("NEET")
-            ? "NEET Medical"
-            : "Foundation 10th",
-          academic_year: "2026-2027",
-          max_capacity: maxCapacity,
-          timing: "08:00 AM - 11:30 AM",
-          room_number: `Room ${101 + i}`,
-          status: "active",
-          student_count: studentCount,
-          capacity_percentage: Math.min(100, Math.round((studentCount / maxCapacity) * 100)),
-          assigned_teachers: [["Amit Kumar"], ["Neha Sharma"], ["Rahul Mishra"], ["Amit Kumar"]][i],
-          teacher_assignments: [
-            { id: "t1", full_name: "Amit Kumar", subject: "Physics" },
-          ],
-          is_active: true,
-          is_demo: true,
-        };
-      });
-      return { data: demoBatches, isDemo: true };
+      return { data: [], error: "Database service is not configured.", isDemo: false };
     }
 
     try {
@@ -91,16 +64,7 @@ export const batchesService = {
     batch: Omit<Batch, "id" | "is_demo" | "student_count" | "capacity_percentage" | "assigned_teachers" | "teacher_assignments">
   ): Promise<{ data: Batch | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      const newBatch: Batch = {
-        id: crypto.randomUUID(),
-        ...batch,
-        student_count: 0,
-        capacity_percentage: 0,
-        assigned_teachers: [],
-        teacher_assignments: [],
-        is_demo: true,
-      };
-      return { data: newBatch };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -108,14 +72,15 @@ export const batchesService = {
         .from("batches")
         .insert({
           name: batch.name.trim(),
-          course_name: batch.course_name,
+          course_name: batch.course_name.trim(),
           academic_year: batch.academic_year || "2026-2027",
           max_capacity: batch.max_capacity || 40,
-          timing: batch.timing?.trim() || null,
-          room_number: batch.room_number?.trim() || null,
+          timing: batch.timing || null,
+          room_number: batch.room_number || null,
           start_date: batch.start_date || null,
           end_date: batch.end_date || null,
-          status: batch.status || "active",
+          status: "active",
+          is_active: true,
         })
         .select()
         .single();
@@ -133,14 +98,12 @@ export const batchesService = {
           max_capacity: data.max_capacity,
           timing: data.timing,
           room_number: data.room_number,
-          start_date: data.start_date,
-          end_date: data.end_date,
-          status: data.status,
+          status: "active",
           student_count: 0,
           capacity_percentage: 0,
           assigned_teachers: [],
           teacher_assignments: [],
-          is_active: data.is_active,
+          is_active: true,
           is_demo: false,
         },
       };
@@ -154,20 +117,23 @@ export const batchesService = {
     updates: Partial<Batch>
   ): Promise<{ data: Batch | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { data: null, error: "Demo mode update not supported." };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
       const payload: Record<string, any> = {};
       if (updates.name !== undefined) payload.name = updates.name.trim();
-      if (updates.course_name !== undefined) payload.course_name = updates.course_name;
+      if (updates.course_name !== undefined) payload.course_name = updates.course_name.trim();
       if (updates.academic_year !== undefined) payload.academic_year = updates.academic_year;
       if (updates.max_capacity !== undefined) payload.max_capacity = updates.max_capacity;
-      if (updates.timing !== undefined) payload.timing = updates.timing?.trim() || null;
-      if (updates.room_number !== undefined) payload.room_number = updates.room_number?.trim() || null;
-      if (updates.start_date !== undefined) payload.start_date = updates.start_date || null;
-      if (updates.end_date !== undefined) payload.end_date = updates.end_date || null;
-      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.timing !== undefined) payload.timing = updates.timing;
+      if (updates.room_number !== undefined) payload.room_number = updates.room_number;
+      if (updates.start_date !== undefined) payload.start_date = updates.start_date;
+      if (updates.end_date !== undefined) payload.end_date = updates.end_date;
+      if (updates.status !== undefined) {
+        payload.status = updates.status;
+        payload.is_active = updates.status === "active";
+      }
 
       const { data, error } = await supabase
         .from("batches")
@@ -189,9 +155,11 @@ export const batchesService = {
           max_capacity: data.max_capacity,
           timing: data.timing,
           room_number: data.room_number,
-          start_date: data.start_date,
-          end_date: data.end_date,
           status: data.status,
+          student_count: 0,
+          capacity_percentage: 0,
+          assigned_teachers: [],
+          teacher_assignments: [],
           is_active: data.is_active,
           is_demo: false,
         },
@@ -203,13 +171,13 @@ export const batchesService = {
 
   async archiveBatch(id: string): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
 
     try {
       const { error } = await supabase
         .from("batches")
-        .update({ status: "archived" })
+        .update({ status: "archived", is_active: false })
         .eq("id", id);
 
       if (error) {
@@ -255,7 +223,7 @@ export const batchesService = {
             : row.status === "on_hold"
             ? "On hold"
             : "Inactive",
-        joined_on: row.joined_on,
+        is_demo: false,
         created_at: row.created_at,
       }));
 
@@ -265,52 +233,74 @@ export const batchesService = {
     }
   },
 
-  async assignTeacher(
-    batchId: string,
-    teacherId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  async assignTeacher(batchId: string, teacherId: string): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
-
     try {
       const { error } = await supabase
         .from("teacher_batches")
-        .insert({
-          batch_id: batchId,
-          teacher_id: teacherId,
-        });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
+        .insert({ batch_id: batchId, teacher_id: teacherId });
+      if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err?.message || "Failed to assign teacher" };
+      return { success: false, error: err.message };
     }
   },
 
-  async removeTeacher(
-    batchId: string,
-    teacherId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  async removeTeacher(batchId: string, teacherId: string): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
-
     try {
       const { error } = await supabase
         .from("teacher_batches")
         .delete()
         .eq("batch_id", batchId)
         .eq("teacher_id", teacherId);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err?.message || "Failed to remove teacher" };
+      return { success: false, error: err.message };
+    }
+  },
+
+  async assignTeachersToBatch(
+    batchId: string,
+    teacherIds: string[]
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const { error: delError } = await supabase
+        .from("teacher_batches")
+        .delete()
+        .eq("batch_id", batchId);
+
+      if (delError) {
+        return { success: false, error: delError.message };
+      }
+
+      if (teacherIds.length > 0) {
+        const payload = teacherIds.map((tId) => ({
+          batch_id: batchId,
+          teacher_id: tId,
+        }));
+
+        const { error: insError } = await supabase
+          .from("teacher_batches")
+          .insert(payload);
+
+        if (insError) {
+          return { success: false, error: insError.message };
+        }
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to assign teachers" };
     }
   },
 };

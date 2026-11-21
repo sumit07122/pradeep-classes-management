@@ -8,7 +8,6 @@ export interface StatCardProps {
   note?: string;
   icon: LucideIcon;
   tone?: "blue" | "violet" | "green" | "amber" | "rose";
-  isDemo?: boolean;
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
@@ -18,7 +17,6 @@ export const StatCard: React.FC<StatCardProps> = ({
   note,
   icon: Icon,
   tone = "blue",
-  isDemo = false,
 }) => {
   const toneClasses = {
     blue: "bg-[#eaf2fa] text-[#376e9f]",
@@ -30,11 +28,6 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <div className="bg-white border border-[#e8edf2] rounded-xl p-4 shadow-sm hover:shadow transition-shadow relative overflow-hidden">
-      {isDemo && (
-        <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 rounded border border-purple-200">
-          Demo
-        </span>
-      )}
       <div className="flex items-center justify-between text-[#788899] text-xs">
         <span className="font-semibold uppercase tracking-wider text-[10px]">{title}</span>
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${toneClasses[tone]}`}>

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { DemoBanner } from "../common/DemoBanner";
 import type { UserRole } from "../../types";
 
 export interface AppShellProps {
@@ -19,7 +18,6 @@ export const AppShell: React.FC<AppShellProps> = ({
   userRole,
   userName = "Administrator",
   pageTitle,
-  isDemoMode = false,
   onSignOut,
   onDevRoleChange,
 }) => {
@@ -48,7 +46,6 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Main Content Area */}
       <main className="main-area flex-1 flex flex-col min-h-screen">
-        {isDemoMode && <DemoBanner />}
         <Topbar
           onOpenMobileNav={() => setMobileNavOpen(true)}
           pageTitle={pageTitle}

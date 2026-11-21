@@ -1,13 +1,13 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { demoTeachers } from "../data/demo";
 import type { Teacher } from "../types";
 
 export const teachersService = {
   async getTeachers(): Promise<{ data: Teacher[]; error?: string; isDemo: boolean }> {
     if (!isSupabaseConfigured || !supabase) {
       return {
-        data: demoTeachers.map((t) => ({ ...t, is_demo: true })),
-        isDemo: true,
+        data: [],
+        error: "Database service is not configured.",
+        isDemo: false,
       };
     }
 
@@ -54,12 +54,7 @@ export const teachersService = {
     teacher: Omit<Teacher, "id" | "is_demo">
   ): Promise<{ data: Teacher | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      const newTeacher: Teacher = {
-        id: crypto.randomUUID(),
-        ...teacher,
-        is_demo: true,
-      };
-      return { data: newTeacher };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -99,17 +94,7 @@ export const teachersService = {
     updates: Partial<Pick<Teacher, "full_name" | "subject" | "phone">>
   ): Promise<{ data: Teacher | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return {
-        data: {
-          id,
-          full_name: updates.full_name || "Faculty",
-          subject: updates.subject || "Subject",
-          phone: updates.phone || "",
-          assigned_batches: [],
-          is_active: true,
-          is_demo: true,
-        },
-      };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -118,13 +103,15 @@ export const teachersService = {
         .update({
           ...(updates.full_name && { full_name: updates.full_name }),
           ...(updates.subject && { subject: updates.subject }),
-          ...(updates.phone !== undefined && { phone: updates.phone }),
+          ...(updates.phone && { phone: updates.phone }),
         })
         .eq("id", id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        return { data: null, error: error.message };
+      }
 
       return {
         data: {
@@ -144,50 +131,61 @@ export const teachersService = {
 
   async toggleTeacherStatus(
     id: string,
-    isActive: boolean
+    currentStatus: boolean
   ): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
 
     try {
       const { error } = await supabase
         .from("teachers")
-        .update({ is_active: isActive })
+        .update({ is_active: !currentStatus })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   },
 
-  async assignTeacherBatches(
+  async assignTeacherToBatches(
     teacherId: string,
     batchIds: string[]
   ): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
 
     try {
-      // 1. Delete existing associations for this teacher
+      // 1. Delete existing associations
       const { error: delError } = await supabase
         .from("teacher_batches")
         .delete()
         .eq("teacher_id", teacherId);
 
-      if (delError) throw delError;
+      if (delError) {
+        return { success: false, error: delError.message };
+      }
 
       // 2. Insert new associations
       if (batchIds.length > 0) {
-        const rows = batchIds.map((bId) => ({
+        const payload = batchIds.map((batchId) => ({
           teacher_id: teacherId,
-          batch_id: bId,
+          batch_id: batchId,
         }));
-        const { error: insError } = await supabase.from("teacher_batches").insert(rows);
-        if (insError) throw insError;
+
+        const { error: insError } = await supabase
+          .from("teacher_batches")
+          .insert(payload);
+
+        if (insError) {
+          return { success: false, error: insError.message };
+        }
       }
 
       return { success: true };

@@ -7,4 +7,3 @@ export * from "./StatCard";
 export * from "./EmptyState";
 export * from "./LoadingSpinner";
 export * from "./AlertNotice";
-export * from "./DemoBanner";

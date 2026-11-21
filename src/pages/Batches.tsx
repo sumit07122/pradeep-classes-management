@@ -20,11 +20,9 @@ import {
 import { BatchModal } from "../components/batches/BatchModal";
 import { TeacherAssignModal } from "../components/batches/TeacherAssignModal";
 import { BatchRosterDrawer } from "../components/batches/BatchRosterDrawer";
-import { useAuth } from "../hooks/useAuth";
 import type { Batch, BatchStatus } from "../types";
 
 export const Batches: React.FC = () => {
-  const { isDemoMode } = useAuth();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -70,9 +68,7 @@ export const Batches: React.FC = () => {
     }
 
     setNotice({
-      message: isDemoMode
-        ? "Batch created in DEMO mode."
-        : `Batch "${res.data.name}" created successfully.`,
+      message: `Batch "${res.data.name}" created successfully.`,
       type: "success",
     });
     setShowCreateModal(false);

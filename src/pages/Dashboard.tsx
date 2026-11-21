@@ -51,11 +51,11 @@ export const Dashboard: React.FC = () => {
     setLoading(true);
 
     if (!isSupabaseConfigured || !supabase) {
-      setStudentCount(24);
-      setTeacherCount(4);
-      setBatchCount(3);
-      setFeeSummary({ total_billed: 120000, total_collected: 75000, total_pending: 45000 });
-      setTodayAttendance({ present: 22, absent: 2, late: 0, total: 24, percentage: 91.6 });
+      setStudentCount(0);
+      setTeacherCount(0);
+      setBatchCount(0);
+      setFeeSummary({ total_billed: 0, total_collected: 0, total_pending: 0 });
+      setTodayAttendance({ present: 0, absent: 0, late: 0, total: 0, percentage: 0 });
       setLoading(false);
       return;
     }

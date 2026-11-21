@@ -145,18 +145,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null);
     setIsLoading(true);
 
-    if (isDemoMode) {
-      // Demo/dev sign-in
-      const mockProfile: UserProfile = {
-        id: "demo-user-id",
-        full_name: email.split("@")[0] || "Institute User",
-        email,
-        role: role,
-      };
-      setUser(mockProfile);
-      setIsAuthenticated(true);
+    if (!isSupabaseConfigured) {
       setIsLoading(false);
-      return { success: true };
+      setAuthError("Database authentication service is not configured.");
+      return { success: false, error: "Database authentication service is not configured." };
     }
 
     const res = await authService.signIn(email, password);

@@ -2,14 +2,13 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Input, Button, AlertNotice } from "../components/common";
-import { env } from "../lib/env";
-import { Mail, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { Mail, Lock, ShieldCheck } from "lucide-react";
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signIn, authError, clearError, isDemoMode } = useAuth();
+  const { signIn, authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,17 +25,6 @@ export const Login: React.FC = () => {
 
     if (result.success) {
       navigate(from, { replace: true });
-    }
-  };
-
-  const handleQuickDemoLogin = async () => {
-    setEmail("admin@pradeepclasses.in");
-    setPassword("demo-password-123");
-    setIsSubmitting(true);
-    const result = await signIn("admin@pradeepclasses.in", "demo-password-123");
-    setIsSubmitting(false);
-    if (result.success) {
-      navigate("/dashboard", { replace: true });
     }
   };
 
@@ -72,27 +60,6 @@ export const Login: React.FC = () => {
               onDismiss={clearError}
               className="mb-5"
             />
-          )}
-
-          {isDemoMode && env.isDev && (
-            <div className="mb-5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
-              <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-1">
-                <Sparkles size={15} />
-                <span>Local Development Preview</span>
-              </div>
-              <p className="text-[11px] text-amber-700 leading-relaxed mb-2">
-                Supabase is not connected. You can click below for instant mock access or use test credentials.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full bg-white hover:bg-amber-100/50 border-amber-300 text-amber-900"
-                onClick={handleQuickDemoLogin}
-              >
-                Sign in with Demo Admin Account
-              </Button>
-            </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">

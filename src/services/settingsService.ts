@@ -9,29 +9,7 @@ export const settingsService = {
    */
   async getInstituteSettings(): Promise<{ data: InstituteSettings | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return {
-        data: {
-          id: "demo-settings",
-          institute_id: DEFAULT_INSTITUTE_ID,
-          institute_name: "Pradeep Classes",
-          tagline: "Excellence in Coaching & Board Preparations",
-          phone: "+91 98200 12345",
-          email: "contact@pradeepclasses.in",
-          address: "101, Vidya Complex, Near Station Road",
-          city: "Mumbai",
-          state: "Maharashtra",
-          pincode: "400001",
-          website: "https://pradeepclasses.in",
-          logo_url: null,
-          academic_year: "2026-2027",
-          default_pass_percentage: 40.0,
-          fee_late_fine_daily: 50.0,
-          currency_symbol: "₹",
-          timezone: "Asia/Kolkata",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -78,29 +56,7 @@ export const settingsService = {
     updates: Partial<Omit<InstituteSettings, "id" | "institute_id" | "created_at" | "updated_at">>
   ): Promise<{ data: InstituteSettings | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return {
-        data: {
-          id: "demo-settings",
-          institute_id: DEFAULT_INSTITUTE_ID,
-          institute_name: updates.institute_name || "Pradeep Classes",
-          tagline: updates.tagline || "",
-          phone: updates.phone || "+91 98200 12345",
-          email: updates.email || "contact@pradeepclasses.in",
-          address: updates.address || "101, Vidya Complex, Near Station Road",
-          city: updates.city || "Mumbai",
-          state: updates.state || "Maharashtra",
-          pincode: updates.pincode || "400001",
-          website: updates.website || "https://pradeepclasses.in",
-          logo_url: updates.logo_url || null,
-          academic_year: updates.academic_year || "2026-2027",
-          default_pass_percentage: updates.default_pass_percentage || 40.0,
-          fee_late_fine_daily: updates.fee_late_fine_daily || 50.0,
-          currency_symbol: updates.currency_symbol || "₹",
-          timezone: updates.timezone || "Asia/Kolkata",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -170,33 +126,7 @@ export const settingsService = {
    */
   async getWhatsAppSettings(): Promise<{ data: WhatsAppSettings | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return {
-        data: {
-          id: "demo-whatsapp-settings",
-          institute_id: DEFAULT_INSTITUTE_ID,
-          is_enabled: false,
-          phone_number_id: "",
-          waba_id: "",
-          business_account_id: "",
-          access_token: "",
-          api_token: "",
-          test_mode: true,
-          verified_number: "+91 98765 43210",
-          sender_phone_number: "+91 98765 43210",
-          send_present_alert: true,
-          notify_on_present: true,
-          send_absent_alert: true,
-          notify_on_absent: true,
-          send_late_alert: true,
-          notify_on_late: true,
-          send_leave_alert: true,
-          notify_on_leave: true,
-          send_fee_receipt_alert: true,
-          send_exam_result_alert: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {

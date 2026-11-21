@@ -16,6 +16,7 @@ import {
   FileCheck2,
   Sparkles,
   Settings,
+  GraduationCap,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { StatCard, Badge, LoadingSpinner, Button } from "../components/common";
@@ -96,17 +97,10 @@ export const Portal: React.FC = () => {
       let targetStudentId = studentData?.id;
       let targetStudent = studentData;
 
-      // If no student record directly linked to profile, fallback to first active student for inspection
       if (!targetStudentId) {
-        const { data: fallbackList } = await supabase
-          .from("students")
-          .select("id, full_name, admission_no, batch_id, batches(name, course_name)")
-          .limit(1);
-
-        if (fallbackList && fallbackList.length > 0) {
-          targetStudentId = fallbackList[0].id;
-          targetStudent = fallbackList[0] as any;
-        }
+        setStudentInfo(null);
+        setLoading(false);
+        return;
       }
 
       if (targetStudentId && targetStudent) {
@@ -180,6 +174,31 @@ export const Portal: React.FC = () => {
 
   if (loading) {
     return <LoadingSpinner label="Loading your academic portal..." size="lg" />;
+  }
+
+  if (!studentInfo) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-lg mx-auto shadow-sm my-8">
+        <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-200">
+          <GraduationCap size={32} />
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-800">Student Account Not Linked</h2>
+        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+          Your portal login account ({user?.email}) is not yet linked to an active student admission record.
+        </p>
+        <p className="text-xs text-slate-400 mt-2">
+          Please contact Pradeep Classes administration to connect your student admission number with this account.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Link
+            to="/settings"
+            className="px-4 py-2 bg-[#102f50] text-white text-xs font-bold rounded-lg hover:bg-[#16466f] transition"
+          >
+            View Account Settings
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

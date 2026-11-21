@@ -14,7 +14,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { FeeRecord, FeeSummary, FeeStatus } from "../types/fees";
 
 export const Fees: React.FC = () => {
-  const { role, isDemoMode } = useAuth();
+  const { role } = useAuth();
   const canManageFees = role === "owner" || role === "admin";
 
   const [records, setRecords] = useState<FeeRecord[]>([]);
@@ -164,7 +164,7 @@ export const Fees: React.FC = () => {
       </div>
 
       {/* KPI Stats */}
-      <FeeStatsSummary summary={summary} isDemo={isDemoMode && records.length === 0} />
+      <FeeStatsSummary summary={summary} />
 
       {/* Fee Table or Empty State */}
       {loading ? (

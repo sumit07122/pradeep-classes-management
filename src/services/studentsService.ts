@@ -1,5 +1,4 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { demoStudents } from "../data/demo";
 import type { Student, StudentFilterParams, StudentBatchHistory } from "../types";
 
 export interface LiveBatchOption {
@@ -17,29 +16,11 @@ export const studentsService = {
     params?: StudentFilterParams
   ): Promise<{ data: Student[]; totalCount: number; error?: string; isDemo: boolean }> {
     if (!isSupabaseConfigured || !supabase) {
-      let filtered = [...demoStudents].map((s) => ({ ...s, is_demo: true }));
-      if (params?.query) {
-        const q = params.query.toLowerCase();
-        filtered = filtered.filter(
-          (s) =>
-            s.full_name.toLowerCase().includes(q) ||
-            s.admission_no.toLowerCase().includes(q) ||
-            s.phone.includes(q)
-        );
-      }
-      if (params?.batchId && params.batchId !== "All") {
-        filtered = filtered.filter((s) => s.batch_name === params.batchId || s.batch_id === params.batchId);
-      }
-      if (params?.className && params.className !== "All") {
-        filtered = filtered.filter((s) => s.class_name === params.className);
-      }
-      if (params?.status && params.status !== "All") {
-        filtered = filtered.filter((s) => s.status === params.status);
-      }
       return {
-        data: filtered,
-        totalCount: filtered.length,
-        isDemo: true,
+        data: [],
+        totalCount: 0,
+        error: "Database service is not configured.",
+        isDemo: false,
       };
     }
 
@@ -99,7 +80,7 @@ export const studentsService = {
         date_of_birth: row.date_of_birth,
         gender: row.gender,
         address: row.address,
-        city: row.city,
+        city: row.city || "Mathura",
         emergency_contact: row.emergency_contact,
         parent_name: row.parent_name,
         parent_phone: row.parent_phone,
@@ -128,8 +109,7 @@ export const studentsService = {
 
   async getStudentById(id: string): Promise<{ data: Student | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      const found = demoStudents.find((s) => s.id === id);
-      return { data: found ? { ...found, is_demo: true } : null };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -156,7 +136,7 @@ export const studentsService = {
         date_of_birth: data.date_of_birth,
         gender: data.gender,
         address: data.address,
-        city: data.city,
+        city: data.city || "Mathura",
         emergency_contact: data.emergency_contact,
         parent_name: data.parent_name,
         parent_phone: data.parent_phone,
@@ -185,11 +165,7 @@ export const studentsService = {
 
   async getLiveBatches(): Promise<LiveBatchOption[]> {
     if (!isSupabaseConfigured || !supabase) {
-      return [
-        { id: "demo-1", name: "JEE Morning", course_name: "JEE Advanced", max_capacity: 40, enrolled_count: 28, status: "active", is_available: true },
-        { id: "demo-2", name: "NEET Evening", course_name: "NEET Medical", max_capacity: 40, enrolled_count: 36, status: "active", is_available: true },
-        { id: "demo-3", name: "Foundation A", course_name: "Foundation 10th", max_capacity: 30, enrolled_count: 15, status: "active", is_available: true },
-      ];
+      return [];
     }
 
     try {
@@ -229,22 +205,7 @@ export const studentsService = {
     student: Partial<Student>
   ): Promise<{ data: Student | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      const newStudent: Student = {
-        id: crypto.randomUUID(),
-        admission_no: `PC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-        full_name: student.full_name || "New Student",
-        class_name: student.class_name || "Class 12",
-        batch_name: student.batch_name || "Unassigned",
-        batch_id: student.batch_id,
-        phone: student.phone || "",
-        email: student.email,
-        parent_name: student.parent_name,
-        parent_phone: student.parent_phone,
-        status: "Active",
-        is_demo: true,
-        created_at: new Date().toISOString(),
-      };
-      return { data: newStudent };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -258,7 +219,7 @@ export const studentsService = {
         date_of_birth: student.date_of_birth || null,
         gender: student.gender || null,
         address: student.address?.trim() || null,
-        city: student.city?.trim() || "Kota",
+        city: student.city?.trim() || "Mathura",
         emergency_contact: student.emergency_contact?.trim() || null,
         parent_name: student.parent_name?.trim() || null,
         parent_phone: student.parent_phone?.trim() || null,
@@ -305,7 +266,7 @@ export const studentsService = {
     updates: Partial<Student>
   ): Promise<{ data: Student | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { data: null, error: "Demo mode update not supported" };
+      return { data: null, error: "Database service is not configured." };
     }
 
     try {
@@ -317,7 +278,7 @@ export const studentsService = {
       if (updates.date_of_birth !== undefined) payload.date_of_birth = updates.date_of_birth || null;
       if (updates.gender !== undefined) payload.gender = updates.gender || null;
       if (updates.address !== undefined) payload.address = updates.address?.trim() || null;
-      if (updates.city !== undefined) payload.city = updates.city?.trim() || "Kota";
+      if (updates.city !== undefined) payload.city = updates.city?.trim() || "Mathura";
       if (updates.emergency_contact !== undefined) payload.emergency_contact = updates.emergency_contact?.trim() || null;
       if (updates.parent_name !== undefined) payload.parent_name = updates.parent_name?.trim() || null;
       if (updates.parent_phone !== undefined) payload.parent_phone = updates.parent_phone?.trim() || null;
@@ -370,7 +331,7 @@ export const studentsService = {
 
   async archiveStudent(id: string): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
 
     try {
@@ -395,7 +356,7 @@ export const studentsService = {
     reason?: string
   ): Promise<{ success: boolean; error?: string; data?: any }> {
     if (!isSupabaseConfigured || !supabase) {
-      return { success: true };
+      return { success: false, error: "Database service is not configured." };
     }
 
     try {

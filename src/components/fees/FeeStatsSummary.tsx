@@ -5,10 +5,9 @@ import type { FeeSummary } from '../../types/fees';
 
 interface FeeStatsSummaryProps {
   summary: FeeSummary;
-  isDemo?: boolean;
 }
 
-export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary, isDemo = false }) => {
+export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary }) => {
   return (
     <section className="stats-grid">
       <StatCard
@@ -18,7 +17,6 @@ export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary, isDem
         note="verified receipts"
         icon={CheckCircle2}
         tone="green"
-        isDemo={isDemo}
       />
       <StatCard
         title="Pending Dues"
@@ -27,7 +25,6 @@ export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary, isDem
         note="unpaid balances"
         icon={Clock}
         tone="amber"
-        isDemo={isDemo}
       />
       <StatCard
         title="Total Target"
@@ -36,7 +33,6 @@ export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary, isDem
         note="total fee invoiced"
         icon={IndianRupee}
         tone="blue"
-        isDemo={isDemo}
       />
       <StatCard
         title="Overdue Dues"
@@ -45,7 +41,6 @@ export const FeeStatsSummary: React.FC<FeeStatsSummaryProps> = ({ summary, isDem
         note="past due date"
         icon={AlertTriangle}
         tone={summary.overdue_invoices_count > 0 ? "amber" : "green"}
-        isDemo={isDemo}
       />
     </section>
   );
