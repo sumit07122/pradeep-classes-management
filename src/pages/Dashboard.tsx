@@ -268,7 +268,7 @@ export const Dashboard: React.FC = () => {
   }
 
   const isTeacher = role === "teacher";
-  const isOwnerOrSuper = role === "owner" || role === "super_admin";
+  const isExecutive = role === "owner" || role === "admin" || role === "super_admin";
   const netSurplus = feeSummary.total_collected - financeOverview.totalExpenses;
   const collectionRate =
     feeSummary.total_billed > 0
@@ -298,7 +298,7 @@ export const Dashboard: React.FC = () => {
               <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-[#102f50] text-amber-300">
                 {isTeacher
                   ? "FACULTY ACADEMIC WORKSPACE"
-                  : isOwnerOrSuper
+                  : isExecutive
                   ? "INSTITUTE EXECUTIVE SUITE"
                   : "OPERATIONS & ADMINISTRATION"}
               </span>
@@ -468,8 +468,8 @@ export const Dashboard: React.FC = () => {
         />
       </section>
 
-      {/* Financial Health & Payment Methods Suite (Owner / Super Admin) */}
-      {(isOwnerOrSuper || role === "admin") && (
+      {/* Financial Health & Payment Methods Suite (Owner / Admin / Super Admin) */}
+      {isExecutive && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Tuition Collection Efficiency */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">

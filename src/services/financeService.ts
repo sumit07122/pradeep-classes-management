@@ -120,6 +120,47 @@ export async function reverseIncome(id: string, reason: string): Promise<void> {
 }
 
 /**
+ * Update an existing direct institute income record
+ */
+export async function updateIncome(
+  id: string,
+  payload: Partial<CreateIncomePayload>
+): Promise<InstituteIncome> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("institute_incomes")
+    .update({
+      ...payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error updating institute income:", error);
+    throw error;
+  }
+  return data as InstituteIncome;
+}
+
+/**
+ * Delete a direct institute income record
+ */
+export async function deleteIncome(id: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("institute_incomes")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting institute income:", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch institute operational expenses
  */
 export async function getExpenses(): Promise<InstituteExpense[]> {
@@ -242,6 +283,56 @@ export async function reverseExpense(id: string, reason: string): Promise<void> 
 
   if (error) {
     console.error("Error reversing expense:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing institute expense record
+ */
+export async function updateExpense(
+  id: string,
+  payload: Partial<CreateExpensePayload>,
+  receiptFile?: File
+): Promise<InstituteExpense> {
+  const supabase = getSupabase();
+  let receiptUrl = payload.receipt_url;
+  if (receiptFile) {
+    receiptUrl = await uploadExpenseReceipt(receiptFile);
+  }
+
+  const updateData: any = {
+    ...payload,
+    ...(receiptUrl !== undefined && { receipt_url: receiptUrl }),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("institute_expenses")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error updating institute expense:", error);
+    throw error;
+  }
+  return data as InstituteExpense;
+}
+
+/**
+ * Delete an institute expense record
+ */
+export async function deleteExpense(id: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("institute_expenses")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting institute expense:", error);
     throw error;
   }
 }

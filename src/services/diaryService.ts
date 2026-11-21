@@ -139,6 +139,100 @@ export const diaryService = {
   },
 
   /**
+   * Update an existing Class Session and linked Class Diary record
+   */
+  async updateClassDiary(
+    sessionId: string,
+    diaryId?: string,
+    dto?: Partial<CreateClassDiaryDTO>
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+
+    try {
+      if (dto) {
+        // 1. Update session fields
+        if (
+          dto.batch_id ||
+          dto.subject ||
+          dto.session_date ||
+          dto.start_time ||
+          dto.end_time ||
+          dto.actual_duration_minutes !== undefined
+        ) {
+          const { error: sessErr } = await supabase
+            .from("class_sessions")
+            .update({
+              ...(dto.batch_id && { batch_id: dto.batch_id }),
+              ...(dto.subject && { subject: dto.subject }),
+              ...(dto.session_date && { session_date: dto.session_date }),
+              ...(dto.start_time && { start_time: dto.start_time }),
+              ...(dto.end_time && { end_time: dto.end_time }),
+              ...(dto.actual_duration_minutes !== undefined && {
+                actual_duration_minutes: dto.actual_duration_minutes,
+              }),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sessionId);
+
+          if (sessErr) throw sessErr;
+        }
+
+        // 2. Update diary fields
+        if (diaryId) {
+          const { error: diaryErr } = await supabase
+            .from("class_diaries")
+            .update({
+              ...(dto.chapter_name !== undefined && { chapter_name: dto.chapter_name.trim() }),
+              ...(dto.topics_covered !== undefined && { topics_covered: dto.topics_covered.trim() }),
+              ...(dto.teaching_remarks !== undefined && {
+                teaching_remarks: dto.teaching_remarks?.trim() || null,
+              }),
+              ...(dto.next_planned_topic !== undefined && {
+                next_planned_topic: dto.next_planned_topic?.trim() || null,
+              }),
+              ...(dto.homework_notes !== undefined && {
+                homework_notes: dto.homework_notes?.trim() || null,
+              }),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", diaryId);
+
+          if (diaryErr) throw diaryErr;
+        }
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("Error updating class diary:", err);
+      return { success: false, error: err.message || "Failed to update class diary" };
+    }
+  },
+
+  /**
+   * Delete a Class Session and its cascaded Class Diary record
+   */
+  async deleteClassDiary(sessionId: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+
+    try {
+      const { error } = await supabase
+        .from("class_sessions")
+        .delete()
+        .eq("id", sessionId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      console.error("Error deleting class diary:", err);
+      return { success: false, error: err.message || "Failed to delete class diary" };
+    }
+  },
+
+  /**
    * Fetch complete syllabus chapters & topics with batch progress
    */
   async getSyllabusWithProgress(batchId?: string): Promise<{ data: SyllabusChapter[]; error?: string }> {

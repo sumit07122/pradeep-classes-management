@@ -1,17 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, UploadCloud, AlertCircle } from "lucide-react";
 import { Button } from "../common";
-import { createExpense } from "../../services/financeService";
-import type { ExpenseCategory, PaymentMethod } from "../../types/finance";
+import { createExpense, updateExpense } from "../../services/financeService";
+import type { ExpenseCategory, PaymentMethod, InstituteExpense } from "../../types/finance";
 
 interface ExpenseModalProps {
   isOpen: boolean;
+  initialData?: InstituteExpense | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   isOpen,
+  initialData,
   onClose,
   onSuccess,
 }) => {
@@ -26,6 +28,27 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setCategory(initialData.category);
+      setAmount(String(initialData.amount));
+      setExpenseDate(initialData.expense_date);
+      setPaymentMethod(initialData.payment_method);
+      setVendorName(initialData.vendor_name || "");
+      setDescription(initialData.description || "");
+      setReceiptFile(null);
+    } else {
+      setCategory("rent");
+      setAmount("");
+      setExpenseDate(new Date().toISOString().split("T")[0]);
+      setPaymentMethod("upi");
+      setVendorName("");
+      setDescription("");
+      setReceiptFile(null);
+    }
+    setError(null);
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -45,27 +68,38 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
-      await createExpense(
-        {
-          category,
-          amount: numAmount,
-          expense_date: expenseDate,
-          payment_method: paymentMethod,
-          vendor_name: vendorName.trim() || undefined,
-          description: description.trim(),
-        },
-        receiptFile || undefined
-      );
 
-      // Reset and close
-      setAmount("");
-      setDescription("");
-      setVendorName("");
-      setReceiptFile(null);
+      if (initialData) {
+        await updateExpense(
+          initialData.id,
+          {
+            category,
+            amount: numAmount,
+            expense_date: expenseDate,
+            payment_method: paymentMethod,
+            vendor_name: vendorName.trim() || undefined,
+            description: description.trim(),
+          },
+          receiptFile || undefined
+        );
+      } else {
+        await createExpense(
+          {
+            category,
+            amount: numAmount,
+            expense_date: expenseDate,
+            payment_method: paymentMethod,
+            vendor_name: vendorName.trim() || undefined,
+            description: description.trim(),
+          },
+          receiptFile || undefined
+        );
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error("Error creating expense:", err);
+      console.error("Error saving expense:", err);
       setError(err.message || "Failed to record expense");
     } finally {
       setIsSubmitting(false);
@@ -78,8 +112,14 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 bg-[#102f50] text-white flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold font-['Manrope']">Record Institute Expense</h3>
-            <p className="text-[11px] text-slate-300">Add an operational cash outflow to the ledger</p>
+            <h3 className="text-base font-bold font-['Manrope']">
+              {initialData ? "Edit Institute Expense" : "Record Institute Expense"}
+            </h3>
+            <p className="text-[11px] text-slate-300">
+              {initialData
+                ? "Update details of this existing expense transaction"
+                : "Add an operational cash outflow to the ledger"}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -197,7 +237,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
               <label className="cursor-pointer flex flex-col items-center gap-1">
                 <UploadCloud size={20} className="text-slate-400" />
                 <span className="text-[11px] font-medium text-slate-600">
-                  {receiptFile ? receiptFile.name : "Choose receipt image or PDF (max 5MB)"}
+                  {receiptFile ? receiptFile.name : initialData?.receipt_url ? "Replace existing receipt file (image/PDF)" : "Choose receipt image or PDF (max 5MB)"}
                 </span>
                 <input
                   type="file"
@@ -227,7 +267,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
               disabled={isSubmitting}
               className="text-xs bg-[#102f50] hover:bg-[#163a60] text-white"
             >
-              {isSubmitting ? "Recording..." : "Save Expense"}
+              {isSubmitting ? "Saving..." : initialData ? "Save Changes" : "Save Expense"}
             </Button>
           </div>
         </form>

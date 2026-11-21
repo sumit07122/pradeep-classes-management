@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import type { Teacher } from "../types";
+import type { Teacher, TeacherSalaryConfigData } from "../types";
+
+const INSTITUTE_ID = "11111111-2222-3333-4444-555555555555";
 
 export const teachersService = {
   async getTeachers(): Promise<{ data: Teacher[]; error?: string; isDemo: boolean }> {
@@ -19,6 +21,11 @@ export const teachersService = {
           teacher_batches (
             batch_id,
             batches ( id, name )
+          ),
+          teacher_salary_configs (
+            calculation_type,
+            base_amount,
+            per_lecture_rate
           )
         `)
         .order("full_name");
@@ -32,6 +39,18 @@ export const teachersService = {
           .map((tb: any) => tb.batches?.name)
           .filter(Boolean);
 
+        const salaryRow = Array.isArray(row.teacher_salary_configs)
+          ? row.teacher_salary_configs[0]
+          : row.teacher_salary_configs;
+
+        const salary_config: TeacherSalaryConfigData | undefined = salaryRow
+          ? {
+              calculation_type: salaryRow.calculation_type,
+              base_amount: Number(salaryRow.base_amount || 0),
+              per_lecture_rate: Number(salaryRow.per_lecture_rate || 0),
+            }
+          : undefined;
+
         return {
           id: row.id,
           profile_id: row.profile_id,
@@ -41,6 +60,7 @@ export const teachersService = {
           assigned_batches: assigned.length > 0 ? assigned : ["General Subject Batch"],
           is_active: row.is_active ?? true,
           is_demo: false,
+          salary_config,
         };
       });
 
@@ -51,7 +71,9 @@ export const teachersService = {
   },
 
   async createTeacher(
-    teacher: Omit<Teacher, "id" | "is_demo">
+    teacher: Omit<Teacher, "id" | "is_demo"> & {
+      salary_config?: TeacherSalaryConfigData;
+    }
   ): Promise<{ data: Teacher | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
       return { data: null, error: "Database service is not configured." };
@@ -65,12 +87,29 @@ export const teachersService = {
           subject: teacher.subject,
           phone: teacher.phone,
           is_active: true,
+          institute_id: INSTITUTE_ID,
         })
         .select()
         .single();
 
       if (error) {
         return { data: null, error: error.message };
+      }
+
+      if (teacher.salary_config) {
+        await supabase
+          .from("teacher_salary_configs")
+          .upsert(
+            {
+              institute_id: INSTITUTE_ID,
+              teacher_id: data.id,
+              calculation_type: teacher.salary_config.calculation_type,
+              base_amount: teacher.salary_config.base_amount,
+              per_lecture_rate: teacher.salary_config.per_lecture_rate,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "teacher_id" }
+          );
       }
 
       return {
@@ -82,6 +121,7 @@ export const teachersService = {
           assigned_batches: teacher.assigned_batches,
           is_active: true,
           is_demo: false,
+          salary_config: teacher.salary_config,
         },
       };
     } catch (err: any) {
@@ -91,7 +131,9 @@ export const teachersService = {
 
   async updateTeacher(
     id: string,
-    updates: Partial<Pick<Teacher, "full_name" | "subject" | "phone">>
+    updates: Partial<Pick<Teacher, "full_name" | "subject" | "phone">> & {
+      salary_config?: TeacherSalaryConfigData;
+    }
   ): Promise<{ data: Teacher | null; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
       return { data: null, error: "Database service is not configured." };
@@ -113,6 +155,22 @@ export const teachersService = {
         return { data: null, error: error.message };
       }
 
+      if (updates.salary_config) {
+        await supabase
+          .from("teacher_salary_configs")
+          .upsert(
+            {
+              institute_id: INSTITUTE_ID,
+              teacher_id: id,
+              calculation_type: updates.salary_config.calculation_type,
+              base_amount: updates.salary_config.base_amount,
+              per_lecture_rate: updates.salary_config.per_lecture_rate,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "teacher_id" }
+          );
+      }
+
       return {
         data: {
           id: data.id,
@@ -122,10 +180,41 @@ export const teachersService = {
           assigned_batches: [],
           is_active: data.is_active ?? true,
           is_demo: false,
+          salary_config: updates.salary_config,
         },
       };
     } catch (err: any) {
       return { data: null, error: err.message };
+    }
+  },
+
+  async deleteTeacher(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      // Check if teacher has conducted class sessions
+      const { count: sessionCount, error: countErr } = await supabase
+        .from("class_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("teacher_id", id);
+
+      if (countErr) throw countErr;
+      if (sessionCount && sessionCount > 0) {
+        return {
+          success: false,
+          error: `Cannot delete faculty member with ${sessionCount} recorded class session(s). Please deactivate them instead to preserve historical academic records.`,
+        };
+      }
+
+      // Delete teacher (cascades to teacher_batches, teacher_salary_configs, teacher_payrolls)
+      const { error } = await supabase.from("teachers").delete().eq("id", id);
+      if (error) throw error;
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete teacher" };
     }
   },
 

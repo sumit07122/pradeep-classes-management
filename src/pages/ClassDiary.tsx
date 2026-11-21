@@ -9,6 +9,9 @@ import {
   BookmarkCheck,
   FileText,
   TrendingUp,
+  Edit2,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice, Modal, StatCard } from "../components/common";
 import { diaryService } from "../services/diaryService";
@@ -26,9 +29,12 @@ export const ClassDiary: React.FC = () => {
   const [syllabus, setSyllabus] = useState<SyllabusChapter[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal: Record Class Diary
+  // Modal: Record / Edit Class Diary
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
+  const [deletingSession, setDeletingSession] = useState<ClassSession | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formBatchId, setFormBatchId] = useState("");
   const [formSubject, setFormSubject] = useState("Physics");
   const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
@@ -44,6 +50,8 @@ export const ClassDiary: React.FC = () => {
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const isStaff = ["super_admin", "owner", "admin", "teacher"].includes(role);
+  const canDelete = ["super_admin", "owner", "admin"].includes(role);
+  const canEdit = canDelete || role === "teacher";
 
   useEffect(() => {
     loadBatchesAndData();
@@ -72,7 +80,39 @@ export const ClassDiary: React.FC = () => {
     }
   };
 
-  const handleCreateDiary = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingSession(null);
+    if (batches.length > 0) setFormBatchId(batches[0].id);
+    setFormSubject("Physics");
+    setFormDate(new Date().toISOString().split("T")[0]);
+    setFormStartTime("09:00");
+    setFormEndTime("10:30");
+    setFormDuration(90);
+    setFormChapter("");
+    setFormTopics("");
+    setFormRemarks("");
+    setFormHomework("");
+    setFormNextTopic("");
+    setIsRecordModalOpen(true);
+  };
+
+  const handleOpenEdit = (sess: ClassSession) => {
+    setEditingSession(sess);
+    setFormBatchId(sess.batch_id);
+    setFormSubject(sess.subject);
+    setFormDate(sess.session_date);
+    setFormStartTime(sess.start_time);
+    setFormEndTime(sess.end_time);
+    setFormDuration(sess.actual_duration_minutes || 90);
+    setFormChapter(sess.diary?.chapter_name || "");
+    setFormTopics(sess.diary?.topics_covered || "");
+    setFormRemarks(sess.diary?.teaching_remarks || "");
+    setFormHomework(sess.diary?.homework_notes || "");
+    setFormNextTopic(sess.diary?.next_planned_topic || "");
+    setIsRecordModalOpen(true);
+  };
+
+  const handleSaveDiary = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formBatchId || !formChapter.trim() || !formTopics.trim()) {
       setNotice({ type: "error", message: "Batch, Chapter, and Topics covered are mandatory." });
@@ -96,19 +136,43 @@ export const ClassDiary: React.FC = () => {
       next_planned_topic: formNextTopic,
     };
 
-    const res = await diaryService.submitClassDiary(dto);
+    let res: { success: boolean; error?: string };
+    if (editingSession) {
+      res = await diaryService.updateClassDiary(editingSession.id, editingSession.diary?.id, dto);
+    } else {
+      res = await diaryService.submitClassDiary(dto);
+    }
+
     setIsSubmitting(false);
 
     if (!res.success) {
-      setNotice({ type: "error", message: res.error || "Failed to record diary." });
+      setNotice({ type: "error", message: res.error || "Failed to save diary." });
     } else {
-      setNotice({ type: "success", message: "Class Diary recorded successfully!" });
+      setNotice({
+        type: "success",
+        message: editingSession
+          ? "Class Diary updated successfully!"
+          : "Class Diary recorded successfully!",
+      });
       setIsRecordModalOpen(false);
-      setFormChapter("");
-      setFormTopics("");
-      setFormRemarks("");
-      setFormHomework("");
-      setFormNextTopic("");
+      setEditingSession(null);
+      loadBatchesAndData();
+    }
+  };
+
+  const handleDeleteDiary = async () => {
+    if (!deletingSession) return;
+    setIsSubmitting(true);
+    setNotice(null);
+
+    const res = await diaryService.deleteClassDiary(deletingSession.id);
+    setIsSubmitting(false);
+
+    if (!res.success) {
+      setNotice({ type: "error", message: res.error || "Failed to delete diary record." });
+    } else {
+      setNotice({ type: "success", message: "Class diary and lecture record deleted." });
+      setDeletingSession(null);
       loadBatchesAndData();
     }
   };
@@ -140,12 +204,12 @@ export const ClassDiary: React.FC = () => {
           </p>
         </div>
 
+        {/* Batch Filter Dropdown */}
         <div className="flex items-center gap-3">
-          {/* Batch Selector */}
           <select
             value={selectedBatchId}
             onChange={(e) => setSelectedBatchId(e.target.value)}
-            className="text-xs font-bold border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-700 shadow-sm focus:ring-2 focus:ring-[#16466f]"
+            className="text-xs font-semibold bg-white border border-slate-300 rounded-lg px-3 py-2 shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#16466f]"
           >
             <option value="all">All Institute Batches</option>
             {batches.map((b) => (
@@ -159,7 +223,7 @@ export const ClassDiary: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setIsRecordModalOpen(true)}
+              onClick={handleOpenCreate}
               icon={<Plus size={15} />}
             >
               Record Class Diary
@@ -168,7 +232,6 @@ export const ClassDiary: React.FC = () => {
         </div>
       </div>
 
-      {/* Notices */}
       {notice && (
         <AlertNotice
           type={notice.type}
@@ -177,11 +240,11 @@ export const ClassDiary: React.FC = () => {
         />
       )}
 
-      {/* KPI Overview Cards */}
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Lectures Conducted"
-          value={sessions.length}
+          value={String(sessions.length)}
           icon={BookOpen}
           note="Recorded in Log"
           tone="blue"
@@ -195,7 +258,9 @@ export const ClassDiary: React.FC = () => {
         />
         <StatCard
           title="Teaching Hours Logged"
-          value={`${Math.round(sessions.reduce((acc, s) => acc + s.actual_duration_minutes, 0) / 60)} hrs`}
+          value={`${Math.round(
+            sessions.reduce((acc, s) => acc + (s.actual_duration_minutes || 90), 0) / 60
+          )} hrs`}
           icon={Clock}
           note="Actual classroom instruction"
           tone="violet"
@@ -205,37 +270,37 @@ export const ClassDiary: React.FC = () => {
           value="100%"
           icon={BookmarkCheck}
           note="Audited daily"
-          tone="green"
+          tone="amber"
         />
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex gap-4 border-b border-slate-200">
         <button
           onClick={() => setActiveTab("diary")}
-          className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${
             activeTab === "diary"
-              ? "border-[#16466f] text-[#16466f]"
-              : "border-transparent text-slate-500 hover:text-slate-800"
+              ? "border-b-2 border-[#16466f] text-[#16466f]"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
-          <FileText size={16} />
+          <FileText size={15} />
           Conducted Lectures & Diary Log ({sessions.length})
         </button>
         <button
           onClick={() => setActiveTab("syllabus")}
-          className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${
             activeTab === "syllabus"
-              ? "border-[#16466f] text-[#16466f]"
-              : "border-transparent text-slate-500 hover:text-slate-800"
+              ? "border-b-2 border-[#16466f] text-[#16466f]"
+              : "text-slate-500 hover:text-slate-800"
           }`}
         >
-          <BookmarkCheck size={16} />
+          <BookmarkCheck size={15} />
           Curriculum & Syllabus Progress Tracker ({syllabus.length} Chapters)
         </button>
       </div>
 
-      {/* Tab 1: Class Diary Feed */}
+      {/* Tab 1: Conducted Lectures Diary Log */}
       {activeTab === "diary" && (
         <div className="space-y-4">
           {loading ? (
@@ -251,7 +316,7 @@ export const ClassDiary: React.FC = () => {
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => setIsRecordModalOpen(true)}
+                  onClick={handleOpenCreate}
                   icon={<Plus size={14} />}
                 >
                   Record First Class Diary
@@ -263,7 +328,7 @@ export const ClassDiary: React.FC = () => {
               {sessions.map((sess) => (
                 <div
                   key={sess.id}
-                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-[#16466f]/40 transition space-y-3"
+                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-[#16466f]/40 transition space-y-3 relative"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -277,7 +342,29 @@ export const ClassDiary: React.FC = () => {
                         {sess.diary?.chapter_name || "General Lecture"}
                       </h4>
                     </div>
-                    <div className="text-right">
+
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {canEdit && (
+                          <button
+                            onClick={() => handleOpenEdit(sess)}
+                            className="p-1 text-slate-400 hover:text-[#16466f] transition"
+                            title="Edit Class Diary"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeletingSession(sess)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition"
+                            title="Delete Class Diary"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+
                       <div className="text-xs font-bold text-slate-700 flex items-center justify-end gap-1">
                         <Calendar size={12} className="text-slate-400" />
                         {new Date(sess.session_date).toLocaleDateString("en-IN", {
@@ -361,97 +448,99 @@ export const ClassDiary: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-4 pt-2">
-              {syllabus.map((chapter) => (
-                <div
-                  key={chapter.id}
-                  className="border border-slate-200 rounded-xl overflow-hidden bg-white"
-                >
-                  <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                        Chapter {chapter.chapter_no} • {chapter.subject} ({chapter.course_name})
-                      </span>
-                      <h4 className="font-extrabold text-slate-800 text-sm">{chapter.title}</h4>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
-                      Est: {chapter.total_estimated_hours} Hours
-                    </span>
-                  </div>
+            {syllabus.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs italic">
+                No syllabus chapters configured for this course.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {syllabus.map((ch) => {
+                  const chCompleted = (ch.topics || []).filter((t) => t.status === "completed").length;
+                  const totalTopics = ch.topics?.length || 0;
+                  const chPct = totalTopics > 0 ? Math.round((chCompleted / totalTopics) * 100) : 0;
 
-                  <div className="divide-y divide-slate-100">
-                    {(chapter.topics || []).map((t) => (
-                      <div
-                        key={t.id}
-                        onClick={() => handleToggleTopicStatus(t.id, t.status || "not_started")}
-                        className={`px-4 py-3 flex items-center justify-between transition cursor-pointer ${
-                          t.status === "completed"
-                            ? "bg-emerald-50/40 hover:bg-emerald-50"
-                            : "hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
+                  return (
+                    <div
+                      key={ch.id}
+                      className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-[#16466f] text-white text-[10px] font-bold rounded">
+                            Ch {ch.chapter_no}
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-sm">{ch.title}</h4>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-semibold text-slate-600">
+                          <span>
+                            {chCompleted}/{totalTopics} Topics
+                          </span>
+                          <Badge variant={chPct === 100 ? "green" : chPct > 0 ? "blue" : "neutral"}>
+                            {chPct}% Done
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Topics List */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2">
+                        {(ch.topics || []).map((t) => (
                           <div
-                            className={`w-5 h-5 rounded flex items-center justify-center border ${
+                            key={t.id}
+                            onClick={() => handleToggleTopicStatus(t.id, t.status || "not_started")}
+                            className={`p-2.5 rounded-lg border text-xs flex items-start gap-2.5 transition ${
+                              isStaff && selectedBatchId !== "all"
+                                ? "cursor-pointer hover:shadow-sm"
+                                : ""
+                            } ${
                               t.status === "completed"
-                                ? "bg-emerald-500 border-emerald-500 text-white"
-                                : "border-slate-300 text-transparent"
+                                ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                                : t.status === "in_progress"
+                                ? "bg-blue-50/80 border-blue-200 text-blue-900"
+                                : "bg-white border-slate-200 text-slate-700"
                             }`}
                           >
-                            <CheckCircle2 size={14} />
-                          </div>
-                          <div>
-                            <span
-                              className={`text-xs font-bold ${
-                                t.status === "completed"
-                                  ? "text-slate-800 line-through opacity-80"
-                                  : "text-slate-800"
-                              }`}
-                            >
-                              Topic {t.topic_no}: {t.title}
+                            <span className="mt-0.5">
+                              {t.status === "completed" ? (
+                                <CheckCircle2 size={14} className="text-emerald-600" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-slate-400" />
+                              )}
                             </span>
-                            {t.description && (
-                              <p className="text-[11px] text-slate-400">{t.description}</p>
-                            )}
+                            <div>
+                              <p className="font-semibold">{t.title}</p>
+                              {t.completed_on && (
+                                <span className="text-[10px] text-emerald-700 block">
+                                  Done {new Date(t.completed_on).toLocaleDateString("en-IN")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-
-                        <Badge
-                          variant={
-                            t.status === "completed"
-                              ? "success"
-                              : t.status === "in_progress"
-                              ? "warning"
-                              : "neutral"
-                          }
-                          size="sm"
-                        >
-                          {t.status === "completed"
-                            ? "Covered"
-                            : t.status === "in_progress"
-                            ? "In Progress"
-                            : "Pending"}
-                        </Badge>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Modal: Record Class Diary */}
+      {/* Record / Edit Class Diary Modal */}
       <Modal
         isOpen={isRecordModalOpen}
-        onClose={() => setIsRecordModalOpen(false)}
-        title="Record Lecture Class Diary"
+        onClose={() => {
+          setIsRecordModalOpen(false);
+          setEditingSession(null);
+        }}
+        title={editingSession ? "Edit Lecture Diary" : "Record Daily Class Diary"}
         maxWidth="lg"
       >
-        <form onSubmit={handleCreateDiary} className="space-y-4">
+        <form onSubmit={handleSaveDiary} className="space-y-4">
           <p className="text-xs text-slate-500">
-            Submit official lesson log for today's lecture. This updates the student timeline and academic audit register.
+            {editingSession
+              ? "Update lesson log details, topics taught, and homework assignments."
+              : "Submit official lesson log for today's lecture. This updates the student timeline and academic audit register."}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -574,7 +663,10 @@ export const ClassDiary: React.FC = () => {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setIsRecordModalOpen(false)}
+              onClick={() => {
+                setIsRecordModalOpen(false);
+                setEditingSession(null);
+              }}
             >
               Cancel
             </Button>
@@ -584,11 +676,54 @@ export const ClassDiary: React.FC = () => {
               size="sm"
               isLoading={isSubmitting}
             >
-              Submit Class Diary
+              {editingSession ? "Save Changes" : "Submit Class Diary"}
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Delete Diary Confirmation Modal */}
+      {deletingSession && (
+        <Modal
+          isOpen={!!deletingSession}
+          onClose={() => setDeletingSession(null)}
+          title="Delete Class Diary & Session"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-bold text-sm text-rose-900">
+                  Delete lecture record for {deletingSession.diary?.chapter_name || deletingSession.subject}?
+                </h4>
+                <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                  Date: {new Date(deletingSession.session_date).toLocaleDateString("en-IN")} • Batch: {deletingSession.batch_name}<br />
+                  This will permanently delete this class session and all associated topics, homework notes, and teacher remarks.
+                </p>
+              </div>
+            </div>
+
+            <div className="modal-actions pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeletingSession(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                isLoading={isSubmitting}
+                onClick={handleDeleteDiary}
+                icon={<Trash2 size={15} />}
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

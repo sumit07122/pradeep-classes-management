@@ -30,6 +30,12 @@ export interface Student {
   is_demo?: boolean;
 }
 
+export interface TeacherSalaryConfigData {
+  calculation_type: "monthly_fixed" | "per_lecture" | "hourly";
+  base_amount: number;
+  per_lecture_rate: number;
+}
+
 export interface Teacher {
   id: string;
   profile_id?: string;
@@ -40,6 +46,7 @@ export interface Teacher {
   is_active?: boolean;
   institute_id?: string;
   is_demo?: boolean;
+  salary_config?: TeacherSalaryConfigData;
 }
 
 export interface BatchTeacherAssignment {

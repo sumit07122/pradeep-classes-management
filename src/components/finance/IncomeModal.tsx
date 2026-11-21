@@ -1,17 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, AlertCircle } from "lucide-react";
 import { Button } from "../common";
-import { createIncome } from "../../services/financeService";
-import type { IncomeSourceType, PaymentMethod } from "../../types/finance";
+import { createIncome, updateIncome } from "../../services/financeService";
+import type { IncomeSourceType, PaymentMethod, InstituteIncome } from "../../types/finance";
 
 interface IncomeModalProps {
   isOpen: boolean;
+  initialData?: InstituteIncome | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export const IncomeModal: React.FC<IncomeModalProps> = ({
   isOpen,
+  initialData,
   onClose,
   onSuccess,
 }) => {
@@ -21,10 +23,29 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
     new Date().toISOString().split("T")[0]
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
-  const [transactionReference, setTransactionReference] = useState<string>("");
+  const [transactionRef, setTransactionRef] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setSourceType(initialData.source_type);
+      setAmount(String(initialData.amount));
+      setIncomeDate(initialData.income_date);
+      setPaymentMethod(initialData.payment_method);
+      setTransactionRef(initialData.transaction_reference || "");
+      setDescription(initialData.description || "");
+    } else {
+      setSourceType("admission_fee");
+      setAmount("");
+      setIncomeDate(new Date().toISOString().split("T")[0]);
+      setPaymentMethod("upi");
+      setTransactionRef("");
+      setDescription("");
+    }
+    setError(null);
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -34,34 +55,42 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
 
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      setError("Please enter a valid income amount greater than ₹0");
+      setError("Please enter a valid revenue amount greater than ₹0");
       return;
     }
     if (!description.trim()) {
-      setError("Please provide a brief description for this income");
+      setError("Please provide a description or payer context for this income");
       return;
     }
 
     try {
       setIsSubmitting(true);
       setError(null);
-      await createIncome({
-        source_type: sourceType,
-        amount: numAmount,
-        income_date: incomeDate,
-        payment_method: paymentMethod,
-        transaction_reference: transactionReference.trim() || undefined,
-        description: description.trim(),
-      });
 
-      // Reset and close
-      setAmount("");
-      setDescription("");
-      setTransactionReference("");
+      if (initialData) {
+        await updateIncome(initialData.id, {
+          source_type: sourceType,
+          amount: numAmount,
+          income_date: incomeDate,
+          payment_method: paymentMethod,
+          transaction_reference: transactionRef.trim() || undefined,
+          description: description.trim(),
+        });
+      } else {
+        await createIncome({
+          source_type: sourceType,
+          amount: numAmount,
+          income_date: incomeDate,
+          payment_method: paymentMethod,
+          transaction_reference: transactionRef.trim() || undefined,
+          description: description.trim(),
+        });
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error("Error creating income record:", err);
+      console.error("Error saving income:", err);
       setError(err.message || "Failed to record income");
     } finally {
       setIsSubmitting(false);
@@ -74,8 +103,14 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 bg-[#102f50] text-white flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold font-['Manrope']">Record Institute Income</h3>
-            <p className="text-[11px] text-slate-300">Add direct non-fee revenue to the institutional ledger</p>
+            <h3 className="text-base font-bold font-['Manrope']">
+              {initialData ? "Edit Institute Income" : "Record Direct Institute Income"}
+            </h3>
+            <p className="text-[11px] text-slate-300">
+              {initialData
+                ? "Update details of this revenue entry"
+                : "Add direct institute inflow (admissions, study modules, exams, events)"}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -95,7 +130,7 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Income Source */}
+            {/* Revenue Source Category */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Income Category *</label>
               <select
@@ -105,7 +140,8 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
                 required
               >
                 <option value="admission_fee">Admission & Registration Fee</option>
-                <option value="study_material">Study Material & Book Sale</option>
+                <option value="study_material">Books & Study Materials</option>
+                <option value="student_fee">Direct Student Fee Receipt</option>
                 <option value="other">Other Operational Revenue</option>
               </select>
             </div>
@@ -113,73 +149,68 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
             {/* Amount */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Amount (₹) *</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-slate-200 pl-7 pr-3 py-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20 font-mono"
-                  required
-                />
-              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                placeholder="e.g. 2500"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20 font-mono"
+                required
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Date */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Date Received *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Receipt Date *</label>
               <input
                 type="date"
                 value={incomeDate}
                 onChange={(e) => setIncomeDate(e.target.value)}
-                className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20 font-mono"
+                className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20"
                 required
               />
             </div>
 
-            {/* Payment Mode */}
+            {/* Payment Method */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Channel *</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                 className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20"
                 required
               >
-                <option value="upi">UPI (GPay, PhonePe, Paytm)</option>
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Direct Bank Transfer / NEFT</option>
+                <option value="upi">UPI (GPay / PhonePe / Paytm)</option>
+                <option value="cash">Cash In Hand</option>
+                <option value="bank_transfer">Bank Transfer (NEFT / IMPS)</option>
                 <option value="cheque">Cheque</option>
-                <option value="other">Other Mode</option>
+                <option value="other">Other</option>
               </select>
             </div>
           </div>
 
-          {/* Reference */}
+          {/* Reference No */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Transaction Reference / Receipt No. (Optional)
-            </label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Transaction Ref / Cheque No.</label>
             <input
               type="text"
-              placeholder="e.g. UPI-9284729184 or Manual Receipt #104"
-              value={transactionReference}
-              onChange={(e) => setTransactionReference(e.target.value)}
+              placeholder="e.g. UPI Ref / Bank UTR / Receipt No."
+              value={transactionRef}
+              onChange={(e) => setTransactionRef(e.target.value)}
               className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Description / Notes *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Payer Details / Description *</label>
             <textarea
               rows={2}
-              placeholder="e.g. Registration kit fee for new admission"
+              placeholder="e.g. Sold JEE Advanced 2026 Physics module set to Rohan Verma..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full text-xs rounded-xl border border-slate-200 p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#102f50]/20"
@@ -188,25 +219,24 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onClose}
               disabled={isSubmitting}
-              className="text-xs text-slate-600 border-slate-200"
+              className="text-xs border-slate-200"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              variant="primary"
               size="sm"
-              isLoading={isSubmitting}
-              className="text-xs bg-[#102f50] hover:bg-[#16466f] text-white"
+              disabled={isSubmitting}
+              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
             >
-              Record Income
+              {isSubmitting ? "Saving..." : initialData ? "Save Changes" : "Save Income"}
             </Button>
           </div>
         </form>
