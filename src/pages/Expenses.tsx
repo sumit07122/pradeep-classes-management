@@ -428,54 +428,56 @@ export const Expenses: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
-                          {canManage && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setEditingExpense(exp);
-                                  setIsAddExpenseOpen(true);
-                                }}
-                                className="p-1 text-slate-400 hover:text-[#16466f] transition"
-                                title="Edit Expense"
-                              >
-                                <Edit2 size={13} />
-                              </button>
-                              <button
-                                onClick={() => setDeletingExpense(exp)}
-                                className="p-1 text-slate-400 hover:text-rose-600 transition"
-                                title="Delete Expense"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </>
-                          )}
-
-                          {exp.status === "approved" ? (
-                            exp.category === "teacher_payroll" ? (
-                              <span
-                                className="text-[10px] font-semibold text-slate-400 cursor-help"
-                                title="Payroll linked expense"
-                              >
-                                Payroll
-                              </span>
-                            ) : (
-                              canManage && (
-                                <button
-                                  onClick={() => setExpenseReversalTarget(exp)}
-                                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline"
-                                  title="Reverse transaction"
-                                >
-                                  Reverse
-                                </button>
-                              )
-                            )
-                          ) : (
+                          {exp.category === "teacher_payroll" ? (
                             <span
-                              className="text-[10px] text-slate-400 cursor-help"
-                              title={exp.reversal_reason || "Reversed transaction"}
+                              className="text-[10px] font-semibold text-slate-400 cursor-help"
+                              title="Faculty payroll disbursements are managed through the Teacher Payroll sheet"
                             >
-                              Reversed
+                              Payroll Linked
                             </span>
+                          ) : (
+                            <>
+                              {canManage && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingExpense(exp);
+                                      setIsAddExpenseOpen(true);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-[#16466f] transition"
+                                    title="Edit Expense"
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => setDeletingExpense(exp)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 transition"
+                                    title="Delete Expense"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </>
+                              )}
+
+                              {exp.status === "approved" ? (
+                                canManage && (
+                                  <button
+                                    onClick={() => setExpenseReversalTarget(exp)}
+                                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:underline"
+                                    title="Reverse transaction"
+                                  >
+                                    Reverse
+                                  </button>
+                                )
+                              ) : (
+                                <span
+                                  className="text-[10px] text-slate-400 cursor-help"
+                                  title={exp.reversal_reason || "Reversed transaction"}
+                                >
+                                  Reversed
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>

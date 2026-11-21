@@ -62,8 +62,8 @@ export const Teachers: React.FC = () => {
 
     const salary_config: TeacherSalaryConfigData = {
       calculation_type: calcType,
-      base_amount: Number(baseAmount) || 0,
-      per_lecture_rate: Number(perLectureRate) || 0,
+      base_amount: calcType === "monthly_fixed" ? (Number(baseAmount) || 0) : 0,
+      per_lecture_rate: calcType !== "monthly_fixed" ? (Number(perLectureRate) || 0) : 0,
     };
 
     const res = await teachersService.createTeacher({
@@ -116,8 +116,8 @@ export const Teachers: React.FC = () => {
 
     const salary_config: TeacherSalaryConfigData = {
       calculation_type: calcType,
-      base_amount: Number(baseAmount) || 0,
-      per_lecture_rate: Number(perLectureRate) || 0,
+      base_amount: calcType === "monthly_fixed" ? (Number(baseAmount) || 0) : 0,
+      per_lecture_rate: calcType !== "monthly_fixed" ? (Number(perLectureRate) || 0) : 0,
     };
 
     const res = await teachersService.updateTeacher(editingTeacher.id, {

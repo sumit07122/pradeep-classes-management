@@ -179,7 +179,7 @@ export const diaryService = {
           if (sessErr) throw sessErr;
         }
 
-        // 2. Update diary fields
+        // 2. Update diary fields (or create diary if session previously had none)
         if (diaryId) {
           const { error: diaryErr } = await supabase
             .from("class_diaries")
@@ -198,6 +198,21 @@ export const diaryService = {
               updated_at: new Date().toISOString(),
             })
             .eq("id", diaryId);
+
+          if (diaryErr) throw diaryErr;
+        } else if (dto.chapter_name || dto.topics_covered) {
+          const { error: diaryErr } = await supabase
+            .from("class_diaries")
+            .insert({
+              institute_id: DEFAULT_INSTITUTE_ID,
+              session_id: sessionId,
+              chapter_name: dto.chapter_name?.trim() || "General Lecture",
+              topics_covered: dto.topics_covered?.trim() || "Topics covered",
+              teaching_remarks: dto.teaching_remarks?.trim() || null,
+              next_planned_topic: dto.next_planned_topic?.trim() || null,
+              homework_notes: dto.homework_notes?.trim() || null,
+              is_draft: false,
+            });
 
           if (diaryErr) throw diaryErr;
         }

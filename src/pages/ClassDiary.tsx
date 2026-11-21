@@ -17,11 +17,13 @@ import { Button, Input, Badge, LoadingSpinner, AlertNotice, Modal, StatCard } fr
 import { diaryService } from "../services/diaryService";
 import { batchesService } from "../services/batchesService";
 import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../lib/supabase";
 import type { ClassSession, CreateClassDiaryDTO, SyllabusChapter } from "../types/diary";
 import type { Batch } from "../types";
 
 export const ClassDiary: React.FC = () => {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+  const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"diary" | "syllabus">("diary");
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -51,7 +53,6 @@ export const ClassDiary: React.FC = () => {
 
   const isStaff = ["super_admin", "owner", "admin", "teacher"].includes(role);
   const canDelete = ["super_admin", "owner", "admin"].includes(role);
-  const canEdit = canDelete || role === "teacher";
 
   useEffect(() => {
     loadBatchesAndData();
@@ -73,6 +74,17 @@ export const ClassDiary: React.FC = () => {
       }
       setSessions(sessRes.data);
       setSyllabus(sylRes.data);
+
+      if (role === "teacher" && user?.id && supabase) {
+        const { data: tData } = await supabase
+          .from("teachers")
+          .select("id")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        if (tData) {
+          setCurrentTeacherId(tData.id);
+        }
+      }
     } catch (err: any) {
       setNotice({ type: "error", message: err.message || "Failed to load class diary." });
     } finally {
@@ -325,45 +337,52 @@ export const ClassDiary: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sessions.map((sess) => (
-                <div
-                  key={sess.id}
-                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-[#16466f]/40 transition space-y-3 relative"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="blue" size="sm">
-                          {sess.subject}
-                        </Badge>
-                        <span className="text-xs font-bold text-slate-800">{sess.batch_name}</span>
-                      </div>
-                      <h4 className="font-extrabold text-[#102f50] text-base mt-1.5">
-                        {sess.diary?.chapter_name || "General Lecture"}
-                      </h4>
-                    </div>
+              {sessions.map((sess) => {
+                const canEditSess =
+                  canDelete ||
+                  (role === "teacher" &&
+                    currentTeacherId !== null &&
+                    sess.teacher_id === currentTeacherId);
 
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        {canEdit && (
-                          <button
-                            onClick={() => handleOpenEdit(sess)}
-                            className="p-1 text-slate-400 hover:text-[#16466f] transition"
-                            title="Edit Class Diary"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => setDeletingSession(sess)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition"
-                            title="Delete Class Diary"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
+                return (
+                  <div
+                    key={sess.id}
+                    className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-[#16466f]/40 transition space-y-3 relative"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="blue" size="sm">
+                            {sess.subject}
+                          </Badge>
+                          <span className="text-xs font-bold text-slate-800">{sess.batch_name}</span>
+                        </div>
+                        <h4 className="font-extrabold text-[#102f50] text-base mt-1.5">
+                          {sess.diary?.chapter_name || "General Lecture"}
+                        </h4>
                       </div>
+
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {canEditSess && (
+                            <button
+                              onClick={() => handleOpenEdit(sess)}
+                              className="p-1 text-slate-400 hover:text-[#16466f] transition"
+                              title="Edit Class Diary"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => setDeletingSession(sess)}
+                              className="p-1 text-slate-400 hover:text-rose-600 transition"
+                              title="Delete Class Diary"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
 
                       <div className="text-xs font-bold text-slate-700 flex items-center justify-end gap-1">
                         <Calendar size={12} className="text-slate-400" />
@@ -419,7 +438,8 @@ export const ClassDiary: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>

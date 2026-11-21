@@ -97,7 +97,7 @@ export const teachersService = {
       }
 
       if (teacher.salary_config) {
-        await supabase
+        const { error: salaryErr } = await supabase
           .from("teacher_salary_configs")
           .upsert(
             {
@@ -110,6 +110,14 @@ export const teachersService = {
             },
             { onConflict: "teacher_id" }
           );
+
+        if (salaryErr) {
+          console.error("Failed to save teacher salary configuration:", salaryErr);
+          return {
+            data: null,
+            error: `Teacher registered, but salary config failed: ${salaryErr.message}`,
+          };
+        }
       }
 
       return {
@@ -156,7 +164,7 @@ export const teachersService = {
       }
 
       if (updates.salary_config) {
-        await supabase
+        const { error: salaryErr } = await supabase
           .from("teacher_salary_configs")
           .upsert(
             {
@@ -169,6 +177,14 @@ export const teachersService = {
             },
             { onConflict: "teacher_id" }
           );
+
+        if (salaryErr) {
+          console.error("Failed to update teacher salary configuration:", salaryErr);
+          return {
+            data: null,
+            error: `Teacher updated, but salary config failed: ${salaryErr.message}`,
+          };
+        }
       }
 
       return {
@@ -194,7 +210,7 @@ export const teachersService = {
     }
 
     try {
-      // Check if teacher has conducted class sessions
+      // 1. Check if teacher has conducted class sessions
       const { count: sessionCount, error: countErr } = await supabase
         .from("class_sessions")
         .select("id", { count: "exact", head: true })
@@ -208,7 +224,21 @@ export const teachersService = {
         };
       }
 
-      // Delete teacher (cascades to teacher_batches, teacher_salary_configs, teacher_payrolls)
+      // 2. Check if teacher has historical payroll disbursements
+      const { count: payrollCount, error: payrollErr } = await supabase
+        .from("teacher_payrolls")
+        .select("id", { count: "exact", head: true })
+        .eq("teacher_id", id);
+
+      if (payrollErr) throw payrollErr;
+      if (payrollCount && payrollCount > 0) {
+        return {
+          success: false,
+          error: `Cannot delete faculty member with ${payrollCount} historical payroll record(s). Please deactivate them instead to preserve financial and tax records.`,
+        };
+      }
+
+      // 3. Delete teacher (cascades to teacher_batches and teacher_salary_configs)
       const { error } = await supabase.from("teachers").delete().eq("id", id);
       if (error) throw error;
 
