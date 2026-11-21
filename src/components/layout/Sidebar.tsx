@@ -179,7 +179,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div>
         {/* Brand */}
-        <div className="brand">
+        <Link
+          to={
+            userRole === "student"
+              ? "/portal"
+              : userRole === "super_admin"
+              ? "/platform"
+              : "/dashboard"
+          }
+          className="brand hover:opacity-95 transition cursor-pointer"
+        >
           <img
             src="/logo.png"
             alt="Pradeep Classes"
@@ -191,12 +200,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <button
             className="mobile-close icon-button ml-auto"
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             aria-label="Close navigation"
           >
             <X size={18} />
           </button>
-        </div>
+        </Link>
 
         {/* Institute Workspace Switcher */}
         <div className="institute-switch">
@@ -228,7 +241,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Icon size={18} />
                 <span>{item.label}</span>
-                {item.label === "Attendance" && <i className="nav-dot" />}
               </Link>
             );
           })}

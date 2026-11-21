@@ -61,6 +61,29 @@ export const ClassDiary: React.FC = () => {
   const loadBatchesAndData = async () => {
     setLoading(true);
     try {
+      if (role === "student" && user?.id && supabase) {
+        const { data: stData } = await supabase
+          .from("students")
+          .select("batch_id, batches(id, name, course_name)")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+
+        if (stData?.batch_id) {
+          const studentBatchId = stData.batch_id;
+          setSelectedBatchId(studentBatchId);
+          const [sessRes, sylRes] = await Promise.all([
+            diaryService.getClassSessions(studentBatchId),
+            diaryService.getSyllabusWithProgress(studentBatchId),
+          ]);
+          setSessions(sessRes.data);
+          setSyllabus(sylRes.data);
+          if (stData.batches) {
+            setBatches([stData.batches as any]);
+          }
+          return;
+        }
+      }
+
       const [bRes, sessRes, sylRes] = await Promise.all([
         batchesService.getBatches(),
         diaryService.getClassSessions(selectedBatchId),
@@ -207,29 +230,42 @@ export const ClassDiary: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
         <div>
-          <div className="eyebrow">ACADEMIC WORKFLOW & LESSON AUDIT</div>
+          <div className="eyebrow">
+            {role === "student" ? "STUDENT LEARNING & LESSON ARCHIVE" : "ACADEMIC WORKFLOW & LESSON AUDIT"}
+          </div>
           <h1 className="text-2xl font-black text-[#102f50] font-['Manrope']">
-            Class Diary & Syllabus Progress
+            {role === "student" ? "My Class Diary & Syllabus Progress" : "Class Diary & Syllabus Progress"}
           </h1>
           <p className="text-xs text-slate-500">
-            Mandatory post-lecture lesson tracking, chapter coverage, and syllabus completion monitoring.
+            {role === "student"
+              ? "Track all topics taught in your daily lectures, study notes, and syllabus completion."
+              : "Mandatory post-lecture lesson tracking, chapter coverage, and syllabus completion monitoring."}
           </p>
         </div>
 
-        {/* Batch Filter Dropdown */}
+        {/* Batch Filter / Badge */}
         <div className="flex items-center gap-3">
-          <select
-            value={selectedBatchId}
-            onChange={(e) => setSelectedBatchId(e.target.value)}
-            className="text-xs font-semibold bg-white border border-slate-300 rounded-lg px-3 py-2 shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#16466f]"
-          >
-            <option value="all">All Institute Batches</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({b.course_name})
-              </option>
-            ))}
-          </select>
+          {role === "student" ? (
+            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 text-xs font-bold text-[#16466f] shadow-sm">
+              <BookOpen size={14} className="text-[#16466f]" />
+              <span>
+                {batches[0]?.name ? `${batches[0].name} (${batches[0].course_name || "Enrolled"})` : "My Enrolled Batch"}
+              </span>
+            </div>
+          ) : (
+            <select
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              className="text-xs font-semibold bg-white border border-slate-300 rounded-lg px-3 py-2 shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#16466f]"
+            >
+              <option value="all">All Institute Batches</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.course_name})
+                </option>
+              ))}
+            </select>
+          )}
 
           {isStaff && (
             <Button
@@ -269,21 +305,31 @@ export const ClassDiary: React.FC = () => {
           tone="green"
         />
         <StatCard
-          title="Teaching Hours Logged"
+          title={role === "student" ? "Classroom Hours" : "Teaching Hours Logged"}
           value={`${Math.round(
             sessions.reduce((acc, s) => acc + (s.actual_duration_minutes || 90), 0) / 60
           )} hrs`}
           icon={Clock}
-          note="Actual classroom instruction"
+          note={role === "student" ? "Instruction received" : "Actual classroom instruction"}
           tone="violet"
         />
-        <StatCard
-          title="Faculty Diary Compliance"
-          value="100%"
-          icon={BookmarkCheck}
-          note="Audited daily"
-          tone="amber"
-        />
+        {role === "student" ? (
+          <StatCard
+            title="Curriculum Chapters"
+            value={String(syllabus.length)}
+            icon={BookmarkCheck}
+            note={`${Math.max(0, allTopics.length - completedTopics)} topics remaining`}
+            tone="amber"
+          />
+        ) : (
+          <StatCard
+            title="Faculty Diary Compliance"
+            value="100%"
+            icon={BookmarkCheck}
+            note="Audited daily"
+            tone="amber"
+          />
+        )}
       </div>
 
       {/* Tabs */}

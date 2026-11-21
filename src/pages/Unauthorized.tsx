@@ -1,7 +1,7 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { ShieldX, ArrowLeft, LogOut } from "lucide-react";
+import { ShieldX, ArrowLeft, LogOut, BookOpen, Clock, FolderDown, Users } from "lucide-react";
 import { Button } from "../components/common";
 
 export const Unauthorized: React.FC = () => {
@@ -47,8 +47,44 @@ export const Unauthorized: React.FC = () => {
             icon={<ArrowLeft size={16} />}
             className="w-full"
           >
-            Return to Authorized Workspace
+            {role === "student" ? "Return to Student Portal" : "Return to Authorized Workspace"}
           </Button>
+
+          {role === "student" && (
+            <div className="pt-2 pb-1 border-t border-slate-100 mt-2">
+              <div className="text-[11px] font-bold text-slate-600 mb-2">Student Authorized Links:</div>
+              <div className="grid grid-cols-2 gap-2 text-left">
+                <Link
+                  to="/portal"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 border border-slate-200 transition"
+                >
+                  <Users size={14} className="text-[#16466f]" />
+                  <span>My Portal</span>
+                </Link>
+                <Link
+                  to="/diary"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 border border-slate-200 transition"
+                >
+                  <BookOpen size={14} className="text-[#16466f]" />
+                  <span>Class Diary</span>
+                </Link>
+                <Link
+                  to="/timetable"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 border border-slate-200 transition"
+                >
+                  <Clock size={14} className="text-[#16466f]" />
+                  <span>Timetable</span>
+                </Link>
+                <Link
+                  to="/materials"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 border border-slate-200 transition"
+                >
+                  <FolderDown size={14} className="text-[#16466f]" />
+                  <span>Materials</span>
+                </Link>
+              </div>
+            </div>
+          )}
 
           <Button
             variant="secondary"

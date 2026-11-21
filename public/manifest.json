@@ -3,9 +3,14 @@
   "name": "Pradeep Classes — Institute Management Platform",
   "icons": [
     {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "320x320"
+    },
+    {
       "src": "/favicon.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192 512x512"
+      "sizes": "320x320"
     }
   ],
   "start_url": "/",
