@@ -11,9 +11,13 @@ import {
   Clock,
   Shield,
   FileText,
+  Upload,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { Badge, Button, LoadingSpinner } from "../common";
 import { studentsService } from "../../services/studentsService";
+import { supabase } from "../../lib/supabase";
 import type { Student, StudentBatchHistory } from "../../types";
 
 interface StudentDetailDrawerProps {
@@ -33,14 +37,24 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   onTransfer,
   onArchived,
 }) => {
-  const [activeTab, setActiveTab] = useState<"profile" | "history">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "history" | "documents">("profile");
   const [history, setHistory] = useState<StudentBatchHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
 
+  // Document Vault State
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadType, setUploadType] = useState("identity_proof");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [docNotice, setDocNotice] = useState<string | null>(null);
+
   useEffect(() => {
     if (student && isOpen) {
       loadHistory();
+      loadDocuments();
     }
   }, [student, isOpen]);
 
@@ -50,6 +64,85 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
     const res = await studentsService.getStudentBatchHistory(student.id);
     setHistory(res.data);
     setLoadingHistory(false);
+  };
+
+  const loadDocuments = async () => {
+    if (!student || !supabase) return;
+    setLoadingDocs(true);
+    const { data } = await supabase
+      .from("student_documents")
+      .select("*")
+      .eq("student_id", student.id)
+      .order("created_at", { ascending: false });
+    setDocuments(data || []);
+    setLoadingDocs(false);
+  };
+
+  const handleUploadDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student || !uploadFile || !uploadTitle.trim() || !supabase) return;
+
+    setIsUploading(true);
+    setDocNotice(null);
+    try {
+      const fileExt = uploadFile.name.split(".").pop();
+      const filePath = `${student.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("student-documents")
+        .upload(filePath, uploadFile);
+
+      if (upErr) throw upErr;
+
+      const { error: insErr } = await supabase.from("student_documents").insert({
+        institute_id: "11111111-2222-3333-4444-555555555555",
+        student_id: student.id,
+        document_type: uploadType,
+        title: uploadTitle.trim(),
+        file_url: filePath,
+        is_verified: false,
+      });
+
+      if (insErr) throw insErr;
+
+      setUploadTitle("");
+      setUploadFile(null);
+      setDocNotice("Document uploaded successfully to student vault.");
+      loadDocuments();
+    } catch (err: any) {
+      setDocNotice(`Error: ${err.message || "Failed to upload document"}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadDoc = async (doc: any) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from("student-documents")
+        .createSignedUrl(doc.file_url, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
+    } catch (err: any) {
+      alert("Failed to open document: " + err.message);
+    }
+  };
+
+  const handleToggleVerify = async (docId: string, currentStatus: boolean) => {
+    if (!supabase) return;
+    await supabase.from("student_documents").update({ is_verified: !currentStatus }).eq("id", docId);
+    loadDocuments();
+  };
+
+  const handleDeleteDoc = async (docId: string, fileUrl: string) => {
+    if (!confirm("Delete this document from vault?")) return;
+    if (!supabase) return;
+    await supabase.from("student_documents").delete().eq("id", docId);
+    await supabase.storage.from("student-documents").remove([fileUrl]);
+    loadDocuments();
   };
 
   if (!isOpen || !student) return null;
@@ -173,6 +266,22 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
               {history.length > 0 && (
                 <span className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.2 rounded-full">
                   {history.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("documents")}
+              className={`pb-2.5 transition-all flex items-center gap-1.5 ${
+                activeTab === "documents"
+                  ? "text-[#16466f] border-b-2 border-[#16466f]"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <FileText size={14} />
+              <span>Document Vault</span>
+              {documents.length > 0 && (
+                <span className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.2 rounded-full">
+                  {documents.length}
                 </span>
               )}
             </button>
@@ -320,7 +429,7 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                   </div>
                 )}
               </>
-            ) : (
+            ) : activeTab === "history" ? (
               /* Tab 2: Batch Transfer History */
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -378,6 +487,139 @@ export const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            ) : (
+              /* TAB 3: Document Vault */
+              <div className="space-y-4">
+                {/* Upload Document Box */}
+                <form
+                  onSubmit={handleUploadDocument}
+                  className="p-4 bg-slate-50 rounded-xl border border-slate-200/90 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <Upload size={14} className="text-[#16466f]" />
+                      Upload to Student Vault
+                    </h4>
+                    <span className="text-[10px] text-slate-400">PDF, JPG, PNG up to 10MB</span>
+                  </div>
+
+                  {docNotice && (
+                    <div className="text-xs p-2 rounded bg-blue-50 text-[#16466f] border border-blue-200">
+                      {docNotice}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Doc Title (e.g. Aadhaar Card, 10th Marksheet)"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs w-full focus:outline-none focus:ring-1 focus:ring-[#16466f]"
+                    />
+                    <select
+                      value={uploadType}
+                      onChange={(e) => setUploadType(e.target.value)}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs w-full focus:outline-none focus:ring-1 focus:ring-[#16466f] bg-white"
+                    >
+                      <option value="identity_proof">Identity Proof (Aadhaar/Passport)</option>
+                      <option value="academic_transcript">Academic Marksheet/Transcript</option>
+                      <option value="photograph">Passport Size Photograph</option>
+                      <option value="certificate">Transfer/Category Certificate</option>
+                      <option value="other">Other Supporting Document</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <input
+                      type="file"
+                      required
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                      className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-[#16466f] file:text-white hover:file:bg-[#12395a]"
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      isLoading={isUploading}
+                      icon={<Upload size={13} />}
+                    >
+                      Upload
+                    </Button>
+                  </div>
+                </form>
+
+                {/* Documents List */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider">
+                    Stored Verification Records ({documents.length})
+                  </h4>
+
+                  {loadingDocs ? (
+                    <LoadingSpinner label="Loading documents..." size="sm" />
+                  ) : documents.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 italic bg-white rounded-xl border border-slate-200">
+                      No documents uploaded for this student yet.
+                    </div>
+                  ) : (
+                    documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#16466f] flex items-center justify-center shrink-0">
+                            <FileText size={16} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">{doc.title}</div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                              <span className="capitalize">{doc.document_type.replace(/_/g, " ")}</span>
+                              <span>•</span>
+                              <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVerify(doc.id, doc.is_verified)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                              doc.is_verified
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                                : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                            }`}
+                            title="Click to toggle verification status"
+                          >
+                            {doc.is_verified ? "Verified ✓" : "Mark Verified"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDoc(doc)}
+                            className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded transition"
+                            title="Open / Download Document"
+                          >
+                            <ExternalLink size={14} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDoc(doc.id, doc.file_url)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                            title="Delete Document"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>

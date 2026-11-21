@@ -7,19 +7,23 @@ import {
   CheckCircle2,
   File,
   Download,
+  HelpCircle,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { materialsService } from "../services/materialsService";
 import { batchesService } from "../services/batchesService";
 import { useAuth } from "../hooks/useAuth";
-import type { Homework, StudyMaterial } from "../types/materials";
+import type { Homework, StudyMaterial, StudentDoubt } from "../types/materials";
 import type { Batch } from "../types";
 
 export const HomeworkMaterials: React.FC = () => {
   const { role } = useAuth();
-  const [activeTab, setActiveTab] = useState<"materials" | "homework">("materials");
+  const [activeTab, setActiveTab] = useState<"materials" | "homework" | "doubts">("materials");
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
+  const [doubts, setDoubts] = useState<StudentDoubt[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -28,6 +32,11 @@ export const HomeworkMaterials: React.FC = () => {
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Doubt response modal
+  const [activeDoubtToRespond, setActiveDoubtToRespond] = useState<StudentDoubt | null>(null);
+  const [responseText, setResponseText] = useState("");
+  const [isRespondingDoubt, setIsRespondingDoubt] = useState(false);
 
   // Form states
   const [materialForm, setMaterialForm] = useState({
@@ -58,15 +67,17 @@ export const HomeworkMaterials: React.FC = () => {
     setLoading(true);
     try {
       const bFilter = selectedBatchId === "all" ? undefined : selectedBatchId;
-      const [matRes, hwRes, batchRes] = await Promise.all([
+      const [matRes, hwRes, batchRes, doubtsRes] = await Promise.all([
         materialsService.getStudyMaterials(bFilter),
         materialsService.getHomework(bFilter),
         batchesService.getBatches(),
+        materialsService.getStudentDoubts(undefined, bFilter),
       ]);
 
       setMaterials(matRes.data);
       setHomeworkList(hwRes.data);
       setBatches(batchRes.data);
+      setDoubts(doubtsRes.data || []);
 
       if (batchRes.data.length > 0 && !materialForm.batch_id) {
         setMaterialForm((prev) => ({ ...prev, batch_id: batchRes.data[0].id }));
@@ -137,6 +148,24 @@ export const HomeworkMaterials: React.FC = () => {
     } else {
       setSuccessNotice("Homework assignment published.");
       setIsHomeworkModalOpen(false);
+      loadData();
+    }
+  };
+
+  const handleRespondDoubt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeDoubtToRespond || !responseText.trim()) return;
+
+    setIsRespondingDoubt(true);
+    const res = await materialsService.respondToDoubt(activeDoubtToRespond.id, responseText.trim());
+    setIsRespondingDoubt(false);
+
+    if (res.error) {
+      setErrorNotice(res.error);
+    } else {
+      setSuccessNotice("Response sent to student.");
+      setActiveDoubtToRespond(null);
+      setResponseText("");
       loadData();
     }
   };
@@ -214,6 +243,22 @@ export const HomeworkMaterials: React.FC = () => {
         >
           <FileText size={17} />
           Homework & Assignments ({homeworkList.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("doubts")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+            activeTab === "doubts"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <HelpCircle size={17} />
+          Student Doubts ({doubts.length})
+          {doubts.filter((d) => d.status === "pending").length > 0 && (
+            <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+              {doubts.filter((d) => d.status === "pending").length} pending
+            </span>
+          )}
         </button>
       </div>
 
@@ -295,7 +340,7 @@ export const HomeworkMaterials: React.FC = () => {
             ))
           )}
         </div>
-      ) : (
+      ) : activeTab === "homework" ? (
         /* Homework Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {homeworkList.length === 0 ? (
@@ -346,6 +391,145 @@ export const HomeworkMaterials: React.FC = () => {
             })
           )}
         </div>
+      ) : (
+        /* Doubts Tab */
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Student Academic Doubt Desk</h3>
+                <p className="text-xs text-slate-500">
+                  Questions submitted by students for batch lectures and subject topics.
+                </p>
+              </div>
+              <Badge variant="blue" size="sm">
+                {doubts.length} Queries
+              </Badge>
+            </div>
+
+            {doubts.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 italic text-xs">
+                No student doubts logged for this batch filter.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {doubts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-3"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="blue" size="sm">{d.subject}</Badge>
+                        <span className="font-bold text-slate-800">{d.student_name}</span>
+                        {d.batch_name && (
+                          <span className="text-slate-400 font-mono text-[11px]">• {d.batch_name}</span>
+                        )}
+                        {d.topic && <span className="text-slate-600 font-semibold">• {d.topic}</span>}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(d.created_at).toLocaleDateString()}
+                        </span>
+                        <Badge
+                          variant={
+                            d.status === "resolved"
+                              ? "success"
+                              : d.status === "in_review"
+                              ? "blue"
+                              : "warning"
+                          }
+                          size="sm"
+                        >
+                          {d.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-900 font-medium leading-relaxed">{d.question}</p>
+
+                    {d.response ? (
+                      <div className="mt-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-900">
+                        <span className="font-bold block text-[10px] uppercase text-emerald-700">
+                          Faculty Resolution:
+                        </span>
+                        <p className="mt-0.5">{d.response}</p>
+                      </div>
+                    ) : (
+                      canManage && (
+                        <div className="pt-2 flex justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<MessageSquare size={13} />}
+                            onClick={() => {
+                              setActiveDoubtToRespond(d);
+                              setResponseText("");
+                            }}
+                          >
+                            Answer Query
+                          </Button>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Answer Doubt Modal */}
+      {activeDoubtToRespond && (
+        <Modal
+          isOpen={!!activeDoubtToRespond}
+          onClose={() => setActiveDoubtToRespond(null)}
+          title={`Answer Student Query: ${activeDoubtToRespond.subject}`}
+          subtitle={`Student: ${activeDoubtToRespond.student_name} • ${activeDoubtToRespond.topic || "General"}`}
+        >
+          <form onSubmit={handleRespondDoubt} className="space-y-4">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+              <span className="font-bold text-slate-700 block mb-1">Student's Question:</span>
+              <p className="text-slate-800 italic">{activeDoubtToRespond.question}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Faculty Resolution / Explanation *
+              </label>
+              <textarea
+                required
+                rows={5}
+                placeholder="Write clear explanation, formula references, or solved steps..."
+                value={responseText}
+                onChange={(e) => setResponseText(e.target.value)}
+                className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f]"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveDoubtToRespond(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isRespondingDoubt}
+                icon={<Send size={13} />}
+              >
+                Send Resolution
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Upload Material Modal */}

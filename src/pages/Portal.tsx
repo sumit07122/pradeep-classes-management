@@ -20,9 +20,14 @@ import {
   Home,
   Bell,
   BookCheck,
+  FileText,
+  HelpCircle,
+  Send,
+  Upload,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { StatCard, Badge, LoadingSpinner, Button } from "../components/common";
+import { StatCard, Badge, LoadingSpinner, Button, AlertNotice, Modal } from "../components/common";
 import { attendanceService } from "../services/attendanceService";
 import { feesService } from "../services/feesService";
 import { academicsService } from "../services/academicsService";
@@ -34,7 +39,7 @@ import { PrintableReceiptModal } from "../components/fees";
 import { supabase } from "../lib/supabase";
 import type { StudentAttendanceStats, FeeRecord, Announcement } from "../types";
 import type { StudentExamResult } from "../types/academics";
-import type { StudyMaterial } from "../types/materials";
+import type { StudyMaterial, Homework, StudentDoubt, HomeworkSubmission } from "../types/materials";
 import type { TimetableEntry } from "../types/timetable";
 import type {
   StudentStreak,
@@ -56,6 +61,8 @@ export const Portal: React.FC = () => {
     | "timetable"
     | "gamification"
     | "certificates"
+    | "documents"
+    | "doubts"
   >("overview");
 
   const [studentInfo, setStudentInfo] = useState<{
@@ -92,6 +99,28 @@ export const Portal: React.FC = () => {
   }>({ streak: null, badges: [], points: [], totalPoints: 0 });
   const [certificates, setCertificates] = useState<StudentCertificate[]>([]);
 
+  // Documents Vault
+  const [studentDocs, setStudentDocs] = useState<any[]>([]);
+  const [docTitle, setDocTitle] = useState("");
+  const [docType, setDocType] = useState("identity_proof");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  // Doubt Desk
+  const [doubts, setDoubts] = useState<StudentDoubt[]>([]);
+  const [doubtSubject, setDoubtSubject] = useState("Physics");
+  const [doubtTopic, setDoubtTopic] = useState("");
+  const [doubtQuestion, setDoubtQuestion] = useState("");
+  const [isSubmittingDoubt, setIsSubmittingDoubt] = useState(false);
+
+  // Homework Submissions
+  const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
+  const [submissions, setSubmissions] = useState<Record<string, HomeworkSubmission>>({});
+  const [activeHwToSubmit, setActiveHwToSubmit] = useState<Homework | null>(null);
+  const [hwSubmissionText, setHwSubmissionText] = useState("");
+  const [isSubmittingHw, setIsSubmittingHw] = useState(false);
+
+  const [portalNotice, setPortalNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -133,7 +162,7 @@ export const Portal: React.FC = () => {
           course_name: (targetStudent.batches as any)?.course_name || "Enrolled Course",
         });
 
-        // Parallel fetch for attendance, fees, exams, materials, timetable, sessions, announcements, gamification, and certificates
+        // Parallel fetch for attendance, fees, exams, materials, timetable, sessions, announcements, gamification, certificates, documents, doubts, homework
         const [
           statsRes,
           logsRes,
@@ -145,6 +174,10 @@ export const Portal: React.FC = () => {
           annRes,
           gamifyRes,
           certRes,
+          docsRes,
+          doubtsRes,
+          hwRes,
+          subsRes,
         ] = await Promise.all([
           attendanceService.getStudentAttendanceSummary(targetStudentId).catch(() => null),
           attendanceService.getStudentRecentAttendance(targetStudentId, 10).catch(() => []),
@@ -156,6 +189,10 @@ export const Portal: React.FC = () => {
           announcementsService.getAnnouncements(targetStudent.batch_id).catch(() => ({ data: [] })),
           diaryService.getStudentGamification(targetStudentId).catch(() => ({ streak: null, badges: [], points: [], totalPoints: 0 })),
           diaryService.getStudentCertificates(targetStudentId).catch(() => []),
+          supabase.from("student_documents").select("*").eq("student_id", targetStudentId).order("created_at", { ascending: false }),
+          materialsService.getStudentDoubts(targetStudentId).catch(() => ({ data: [] })),
+          materialsService.getHomework(targetStudent.batch_id).catch(() => ({ data: [] })),
+          materialsService.getHomeworkSubmissions(undefined, targetStudentId).catch(() => ({ data: [] })),
         ]);
 
         if (statsRes) setAttendanceStats(statsRes);
@@ -168,11 +205,141 @@ export const Portal: React.FC = () => {
         setAnnouncements(annRes.data || []);
         setGamification(gamifyRes);
         setCertificates(certRes);
+        setStudentDocs(docsRes?.data || []);
+        setDoubts(doubtsRes.data || []);
+        setHomeworkList(hwRes.data || []);
+
+        const subMap: Record<string, HomeworkSubmission> = {};
+        (subsRes.data || []).forEach((s) => {
+          subMap[s.homework_id] = s;
+        });
+        setSubmissions(subMap);
       }
     } catch (err) {
       console.error("Error loading student portal data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadStudentDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentInfo || !docFile || !docTitle.trim() || !supabase) return;
+
+    setIsUploadingDoc(true);
+    setPortalNotice(null);
+    try {
+      const ext = docFile.name.split(".").pop();
+      const filePath = `${studentInfo.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("student-documents")
+        .upload(filePath, docFile);
+
+      if (upErr) throw upErr;
+
+      const { error: insErr } = await supabase.from("student_documents").insert({
+        institute_id: "11111111-2222-3333-4444-555555555555",
+        student_id: studentInfo.id,
+        document_type: docType,
+        title: docTitle.trim(),
+        file_url: filePath,
+        is_verified: false,
+      });
+
+      if (insErr) throw insErr;
+
+      setDocTitle("");
+      setDocFile(null);
+      setPortalNotice({ type: "success", message: "Document uploaded successfully to your vault." });
+      
+      const { data: updatedDocs } = await supabase
+        .from("student_documents")
+        .select("*")
+        .eq("student_id", studentInfo.id)
+        .order("created_at", { ascending: false });
+      setStudentDocs(updatedDocs || []);
+    } catch (err: any) {
+      setPortalNotice({ type: "error", message: err.message || "Failed to upload document" });
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleDownloadStudentDoc = async (doc: any) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from("student-documents")
+        .createSignedUrl(doc.file_url, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
+    } catch (err: any) {
+      alert("Failed to access document: " + err.message);
+    }
+  };
+
+  const handleCreateDoubt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentInfo || !doubtQuestion.trim()) return;
+
+    setIsSubmittingDoubt(true);
+    setPortalNotice(null);
+    try {
+      const res = await materialsService.createStudentDoubt({
+        student_id: studentInfo.id,
+        batch_id: studentInfo.batch_id,
+        subject: doubtSubject,
+        topic: doubtTopic.trim() || undefined,
+        question: doubtQuestion.trim(),
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      setDoubtQuestion("");
+      setDoubtTopic("");
+      setPortalNotice({ type: "success", message: "Doubt submitted to faculty. You will see their answer here." });
+
+      const dRes = await materialsService.getStudentDoubts(studentInfo.id);
+      setDoubts(dRes.data || []);
+    } catch (err: any) {
+      setPortalNotice({ type: "error", message: err.message || "Failed to submit doubt" });
+    } finally {
+      setIsSubmittingDoubt(false);
+    }
+  };
+
+  const handleSubmitHomework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentInfo || !activeHwToSubmit || !hwSubmissionText.trim()) return;
+
+    setIsSubmittingHw(true);
+    setPortalNotice(null);
+    try {
+      const res = await materialsService.submitHomework({
+        homework_id: activeHwToSubmit.id,
+        student_id: studentInfo.id,
+        submission_text: hwSubmissionText.trim(),
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      setPortalNotice({ type: "success", message: "Homework solution submitted successfully!" });
+      setActiveHwToSubmit(null);
+      setHwSubmissionText("");
+
+      const subsRes = await materialsService.getHomeworkSubmissions(undefined, studentInfo.id);
+      const subMap: Record<string, HomeworkSubmission> = {};
+      (subsRes.data || []).forEach((s) => {
+        subMap[s.homework_id] = s;
+      });
+      setSubmissions(subMap);
+    } catch (err: any) {
+      setPortalNotice({ type: "error", message: err.message || "Failed to submit homework" });
+    } finally {
+      setIsSubmittingHw(false);
     }
   };
 
@@ -405,7 +572,39 @@ export const Portal: React.FC = () => {
           <FileCheck2 size={16} />
           Certificates ({certificates.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab("documents")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "documents"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <FileText size={16} />
+          Document Vault ({studentDocs.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("doubts")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "doubts"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <HelpCircle size={16} />
+          Doubt Desk ({doubts.length})
+        </button>
       </div>
+
+      {portalNotice && (
+        <AlertNotice
+          type={portalNotice.type}
+          message={portalNotice.message}
+          onDismiss={() => setPortalNotice(null)}
+        />
+      )}
 
       {/* Tab: Overview (Daily Home) */}
       {activeTab === "overview" && (
@@ -583,9 +782,99 @@ export const Portal: React.FC = () => {
       {/* Tab: Homework & Class Diary */}
       {activeTab === "homework" && (
         <div className="space-y-6">
+          {/* Homework Assignments & Online Submissions */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div className="border-b border-slate-100 pb-4 mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Homework Tasks & Submissions</h3>
+                <p className="text-xs text-slate-500">
+                  Submit your solutions online and view faculty grades and corrections.
+                </p>
+              </div>
+              <Badge variant="blue" size="sm">{homeworkList.length} Tasks</Badge>
+            </div>
+
+            {homeworkList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400 italic">
+                No formal homework tasks assigned yet for your batch.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {homeworkList.map((hw) => {
+                  const submission = submissions[hw.id];
+                  return (
+                    <div
+                      key={hw.id}
+                      className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-3 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold text-[#16466f]">{hw.subject || "General"}</span>
+                          <span className="text-slate-400 font-mono text-[11px]">Due: {hw.due_date}</span>
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-sm">{hw.title}</h4>
+                        {hw.description && (
+                          <p className="text-xs text-slate-600 mt-1 line-clamp-3 leading-relaxed">
+                            {hw.description}
+                          </p>
+                        )}
+                        {hw.max_marks && (
+                          <span className="text-[11px] text-slate-400 mt-1 block">
+                            Max Marks: <b>{hw.max_marks}</b>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                        {submission ? (
+                          <div className="space-y-1 w-full">
+                            <div className="flex items-center justify-between text-xs">
+                              <Badge
+                                variant={
+                                  submission.status === "graded"
+                                    ? "success"
+                                    : submission.status === "returned"
+                                    ? "warning"
+                                    : "blue"
+                                }
+                                size="sm"
+                              >
+                                {submission.status === "graded" ? `Graded: ${submission.grade}` : submission.status.toUpperCase()}
+                              </Badge>
+                              <span className="text-[10px] text-slate-400">
+                                Submitted {new Date(submission.submitted_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {submission.remarks && (
+                              <p className="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200 mt-1 italic">
+                                <b>Faculty:</b> {submission.remarks}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<Send size={13} />}
+                            onClick={() => {
+                              setActiveHwToSubmit(hw);
+                              setHwSubmissionText("");
+                            }}
+                          >
+                            Submit Solution
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <div className="border-b border-slate-100 pb-4 mb-4">
-              <h3 className="font-bold text-slate-800 text-base">All Class Diary Entries & Homework</h3>
+              <h3 className="font-bold text-slate-800 text-base">All Class Diary Entries & Lectures</h3>
               <p className="text-xs text-slate-500">
                 Track every lecture taught, topics covered, and assigned homework in your batch.
               </p>
@@ -1107,6 +1396,314 @@ export const Portal: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Tab 8: Documents Vault */}
+      {activeTab === "documents" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Upload Student Document</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Securely store identity proof, marksheets, and transfer certificates in your private vault.
+            </p>
+
+            <form onSubmit={handleUploadStudentDoc} className="space-y-3 max-w-xl">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Document Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Class 10 Board Marksheet / Aadhar Card"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Document Category
+                  </label>
+                  <select
+                    value={docType}
+                    onChange={(e) => setDocType(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f] bg-white"
+                  >
+                    <option value="identity_proof">Identity Proof (Aadhar / PAN / Passport)</option>
+                    <option value="address_proof">Address Proof</option>
+                    <option value="marksheet">Academic Marksheet</option>
+                    <option value="transfer_certificate">Transfer Certificate (TC)</option>
+                    <option value="other">Other Official Document</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Attach File (PDF, PNG, JPG) *
+                  </label>
+                  <input
+                    type="file"
+                    required
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  isLoading={isUploadingDoc}
+                  icon={<Upload size={13} />}
+                >
+                  Upload to Vault
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Your Verified Documents ({studentDocs.length})</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Cryptographically stored records in Pradeep Classes private storage.
+            </p>
+
+            {studentDocs.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 italic text-xs">
+                No documents uploaded yet. Upload your admission documents above for administrative verification.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {studentDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 text-[#16466f] flex items-center justify-center shrink-0">
+                        <FileText size={18} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 text-sm">{doc.title}</div>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                          <span className="capitalize">{doc.document_type.replace(/_/g, " ")}</span>
+                          <span>•</span>
+                          <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Badge variant={doc.is_verified ? "success" : "neutral"} size="sm">
+                        {doc.is_verified ? "Verified ✓" : "Pending Verification"}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadStudentDoc(doc)}
+                        className="p-1.5 text-[#16466f] bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition"
+                        title="Download / View Signed Document"
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 9: Doubt Desk */}
+      {activeTab === "doubts" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Ask a Doubt / Academic Query</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Submit your academic questions directly to your batch subject faculties.
+            </p>
+
+            <form onSubmit={handleCreateDoubt} className="space-y-3 max-w-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Subject *
+                  </label>
+                  <select
+                    value={doubtSubject}
+                    onChange={(e) => setDoubtSubject(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f] bg-white"
+                  >
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Biology">Biology</option>
+                    <option value="English">English</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Chapter / Topic (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Thermodynamics, Coordinate Geometry"
+                    value={doubtTopic}
+                    onChange={(e) => setDoubtTopic(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Your Question / Doubt Details *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Explain clearly what concept or problem step you need help with..."
+                  value={doubtQuestion}
+                  onChange={(e) => setDoubtQuestion(e.target.value)}
+                  className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f]"
+                />
+              </div>
+
+              <div className="pt-1">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  isLoading={isSubmittingDoubt}
+                  icon={<Send size={13} />}
+                >
+                  Submit Academic Doubt
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Your Submitted Doubts ({doubts.length})</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Real-time answers and resolutions from faculty members.
+            </p>
+
+            {doubts.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 italic text-xs">
+                You haven't submitted any doubts yet. Post any question above for faculty review.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {doubts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-5 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-3"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="blue" size="sm">{d.subject}</Badge>
+                        {d.topic && <span className="font-semibold text-slate-600">• {d.topic}</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(d.created_at).toLocaleDateString()}
+                        </span>
+                        <Badge
+                          variant={
+                            d.status === "resolved"
+                              ? "success"
+                              : d.status === "in_review"
+                              ? "blue"
+                              : "warning"
+                          }
+                          size="sm"
+                        >
+                          {d.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{d.question}</h4>
+                    </div>
+
+                    {d.response ? (
+                      <div className="mt-3 p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                        <div className="flex items-center justify-between font-bold text-emerald-900 text-[11px]">
+                          <span>Faculty Resolution / Answer:</span>
+                          {d.responded_at && (
+                            <span className="text-emerald-700 font-normal text-[10px]">
+                              Answered {new Date(d.responded_at).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-emerald-900 leading-relaxed mt-1">{d.response}</p>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 italic flex items-center gap-1.5 pt-1">
+                        <Clock size={12} /> Assigned to batch faculty for review.
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Homework Submission Modal */}
+      {activeHwToSubmit && (
+        <Modal
+          isOpen={!!activeHwToSubmit}
+          onClose={() => setActiveHwToSubmit(null)}
+          title={`Submit Homework: ${activeHwToSubmit.title}`}
+          subtitle={`Subject: ${activeHwToSubmit.subject || "General"} • Due Date: ${activeHwToSubmit.due_date}`}
+        >
+          <form onSubmit={handleSubmitHomework} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Your Solution / Explanations / Notes *
+              </label>
+              <textarea
+                required
+                rows={5}
+                placeholder="Type your homework answers, key steps, or reference links here..."
+                value={hwSubmissionText}
+                onChange={(e) => setHwSubmissionText(e.target.value)}
+                className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16466f]"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setActiveHwToSubmit(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isSubmittingHw}
+                icon={<Send size={13} />}
+              >
+                Submit Assignment
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Printable Receipt Modal */}

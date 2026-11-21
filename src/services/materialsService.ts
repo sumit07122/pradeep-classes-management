@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import type { Homework, StudyMaterial } from "../types";
+import type { Homework, StudyMaterial, StudentDoubt, HomeworkSubmission } from "../types";
 
 export const materialsService = {
   async getHomework(batchId?: string): Promise<{ data: Homework[]; error?: string }> {
@@ -211,6 +211,234 @@ export const materialsService = {
       return { url: data.publicUrl };
     } catch (err: any) {
       return { url: null, error: err.message || "File upload failed" };
+    }
+  },
+
+  /**
+   * Fetch doubts for a student, a batch, or the institute
+   */
+  async getStudentDoubts(studentId?: string, batchId?: string): Promise<{ data: StudentDoubt[]; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { data: [] };
+
+    try {
+      let query = supabase
+        .from("student_doubts")
+        .select(`
+          id, institute_id, student_id, batch_id, subject, topic,
+          question, attachment_url, status, response, responded_by,
+          responded_at, created_at, updated_at,
+          students ( full_name, admission_no ),
+          batches ( name )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (studentId) {
+        query = query.eq("student_id", studentId);
+      }
+      if (batchId && batchId !== "all") {
+        query = query.eq("batch_id", batchId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const items: StudentDoubt[] = (data || []).map((row: any) => ({
+        id: row.id,
+        institute_id: row.institute_id,
+        student_id: row.student_id,
+        student_name: row.students?.full_name || "Student",
+        batch_id: row.batch_id,
+        batch_name: row.batches?.name || "Batch",
+        subject: row.subject,
+        topic: row.topic,
+        question: row.question,
+        attachment_url: row.attachment_url,
+        status: row.status as any,
+        response: row.response,
+        responded_by: row.responded_by,
+        responded_at: row.responded_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+
+      return { data: items };
+    } catch (err: any) {
+      return { data: [], error: err.message || "Failed to load student doubts" };
+    }
+  },
+
+  /**
+   * Submit a student doubt
+   */
+  async createStudentDoubt(payload: {
+    student_id: string;
+    batch_id?: string | null;
+    subject: string;
+    topic?: string;
+    question: string;
+    attachment_url?: string;
+  }): Promise<{ data: StudentDoubt | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { data: null, error: "Database not configured" };
+
+    try {
+      const { data, error } = await supabase
+        .from("student_doubts")
+        .insert({
+          student_id: payload.student_id,
+          batch_id: payload.batch_id || null,
+          subject: payload.subject,
+          topic: payload.topic?.trim() || null,
+          question: payload.question.trim(),
+          attachment_url: payload.attachment_url || null,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data: data as StudentDoubt };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to post doubt" };
+    }
+  },
+
+  /**
+   * Faculty response to a student doubt
+   */
+  async respondToDoubt(
+    doubtId: string,
+    response: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { success: false, error: "Database not configured" };
+
+    try {
+      const { data: userProfile } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("student_doubts")
+        .update({
+          response: response.trim(),
+          status: "resolved",
+          responded_by: userProfile.user?.id || null,
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", doubtId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to submit response" };
+    }
+  },
+
+  /**
+   * Fetch submissions for homework
+   */
+  async getHomeworkSubmissions(
+    homeworkId?: string,
+    studentId?: string
+  ): Promise<{ data: HomeworkSubmission[]; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { data: [] };
+
+    try {
+      let query = supabase
+        .from("homework_submissions")
+        .select(`
+          id, institute_id, homework_id, student_id, submission_text,
+          file_url, status, grade, remarks, submitted_at, graded_at, graded_by,
+          students ( full_name ),
+          homework ( title )
+        `)
+        .order("submitted_at", { ascending: false });
+
+      if (homeworkId) query = query.eq("homework_id", homeworkId);
+      if (studentId) query = query.eq("student_id", studentId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const items: HomeworkSubmission[] = (data || []).map((row: any) => ({
+        id: row.id,
+        institute_id: row.institute_id,
+        homework_id: row.homework_id,
+        homework_title: row.homework?.title || "Homework",
+        student_id: row.student_id,
+        student_name: row.students?.full_name || "Student",
+        submission_text: row.submission_text,
+        file_url: row.file_url,
+        status: row.status as any,
+        grade: row.grade,
+        remarks: row.remarks,
+        submitted_at: row.submitted_at,
+        graded_at: row.graded_at,
+        graded_by: row.graded_by,
+      }));
+
+      return { data: items };
+    } catch (err: any) {
+      return { data: [], error: err.message || "Failed to load submissions" };
+    }
+  },
+
+  /**
+   * Submit homework solution by student
+   */
+  async submitHomework(payload: {
+    homework_id: string;
+    student_id: string;
+    submission_text?: string;
+    file_url?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { success: false, error: "Database not configured" };
+
+    try {
+      const { error } = await supabase
+        .from("homework_submissions")
+        .upsert(
+          {
+            homework_id: payload.homework_id,
+            student_id: payload.student_id,
+            submission_text: payload.submission_text?.trim() || null,
+            file_url: payload.file_url || null,
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+          },
+          { onConflict: "homework_id,student_id" }
+        );
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to submit homework" };
+    }
+  },
+
+  /**
+   * Grade a homework submission by teacher/admin
+   */
+  async gradeHomeworkSubmission(
+    submissionId: string,
+    payload: { grade: string; remarks?: string; status?: "graded" | "returned" }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { success: false, error: "Database not configured" };
+
+    try {
+      const { data: userProfile } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("homework_submissions")
+        .update({
+          grade: payload.grade.trim(),
+          remarks: payload.remarks?.trim() || null,
+          status: payload.status || "graded",
+          graded_at: new Date().toISOString(),
+          graded_by: userProfile.user?.id || null,
+        })
+        .eq("id", submissionId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to grade submission" };
     }
   },
 };
