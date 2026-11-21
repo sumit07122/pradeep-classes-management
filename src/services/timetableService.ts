@@ -101,6 +101,54 @@ export const timetableService = {
     }
   },
 
+  async updateTimetableEntry(
+    id: string,
+    entry: Partial<Omit<TimetableEntry, "id" | "created_at" | "institute_id">>
+  ): Promise<{ data: TimetableEntry | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) return { data: null, error: "Database not configured" };
+
+    try {
+      const payload: Record<string, any> = {};
+      if (entry.batch_id !== undefined) payload.batch_id = entry.batch_id;
+      if (entry.subject !== undefined) payload.subject = entry.subject;
+      if (entry.day_of_week !== undefined) payload.day_of_week = entry.day_of_week;
+      if (entry.start_time !== undefined) payload.start_time = entry.start_time;
+      if (entry.end_time !== undefined) payload.end_time = entry.end_time;
+      if (entry.teacher_id !== undefined) payload.teacher_id = entry.teacher_id || null;
+      if (entry.room_number !== undefined) payload.room_number = entry.room_number?.trim() || null;
+      if (entry.is_active !== undefined) payload.is_active = entry.is_active;
+
+      const { data, error } = await supabase
+        .from("timetables")
+        .update(payload)
+        .eq("id", id)
+        .select("*, batches(name), teachers(full_name)")
+        .single();
+
+      if (error) throw error;
+
+      return {
+        data: {
+          id: data.id,
+          institute_id: data.institute_id,
+          batch_id: data.batch_id,
+          batch_name: data.batches?.name || "Assigned Batch",
+          teacher_id: data.teacher_id,
+          teacher_name: data.teachers?.full_name || "Faculty",
+          subject: data.subject,
+          day_of_week: data.day_of_week,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          room_number: data.room_number || "Classroom",
+          is_active: data.is_active,
+          created_at: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to update timetable entry" };
+    }
+  },
+
   async deleteTimetableEntry(id: string): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured || !supabase) return { success: false };
 
@@ -121,6 +169,13 @@ export const timetableService = {
     entry: Omit<TimetableEntry, "id" | "created_at" | "institute_id">
   ): Promise<{ data: TimetableEntry | null; error?: string }> {
     return this.createTimetableEntry(entry);
+  },
+
+  async updateEntry(
+    id: string,
+    entry: Partial<Omit<TimetableEntry, "id" | "created_at" | "institute_id">>
+  ): Promise<{ data: TimetableEntry | null; error?: string }> {
+    return this.updateTimetableEntry(id, entry);
   },
 
   async deleteEntry(id: string): Promise<{ success: boolean; error?: string }> {

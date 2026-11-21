@@ -24,7 +24,20 @@ export const Login: React.FC = () => {
     setIsSubmitting(false);
 
     if (result.success) {
-      navigate(from, { replace: true });
+      const userRole = (result as any).role || (email.toLowerCase().includes("student") ? "student" : "admin");
+      let destination = from;
+
+      if (userRole === "student") {
+        // Students are restricted to /portal and /settings
+        destination = (from && (from.startsWith("/portal") || from.startsWith("/settings"))) ? from : "/portal";
+      } else if (userRole === "super_admin") {
+        destination = (from && !from.includes("login") && from !== "/") ? from : "/platform";
+      } else {
+        // Owner, Admin, Teacher
+        destination = (from && from !== "/" && from !== "/unauthorized" && from !== "/login") ? from : "/dashboard";
+      }
+
+      navigate(destination, { replace: true });
     }
   };
 

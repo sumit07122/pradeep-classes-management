@@ -26,6 +26,7 @@ import { Expenses } from "../pages/Expenses";
 import { TeacherPayroll } from "../pages/TeacherPayroll";
 import { ClassDiary } from "../pages/ClassDiary";
 import { PlatformAdmin } from "../pages/PlatformAdmin";
+import { DataMigration } from "../pages/DataMigration";
 
 export const AppRoutes: React.FC = () => {
   const { role, user, signOut, setDevRole } = useAuth();
@@ -209,6 +210,16 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
             {wrapWithShell("Reports & Export", <Reports />)}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Data Migration Center */}
+      <Route
+        path="/migration"
+        element={
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+            {wrapWithShell("Data Migration Center", <DataMigration />)}
           </ProtectedRoute>
         }
       />

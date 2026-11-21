@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(res.user);
     setRole(res.user.role);
     setIsAuthenticated(true);
-    return { success: true };
+    return { success: true, role: res.user.role, user: res.user };
   };
 
   const signOut = async () => {

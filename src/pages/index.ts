@@ -9,3 +9,4 @@ export * from "./Attendance";
 export * from "./Fees";
 export * from "./Academics";
 export * from "./Portal";
+export * from "./DataMigration";

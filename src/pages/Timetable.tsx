@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Clock,
   Plus,
@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Trash2,
+  Edit2,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { timetableService } from "../services/timetableService";
@@ -30,7 +31,18 @@ export const Timetable: React.FC = () => {
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  // New entry form state
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Preset common coaching time slots
+  const PRESET_SLOTS = [
+    { label: "09:00 - 10:30 AM", start: "09:00", end: "10:30" },
+    { label: "11:00 - 12:30 PM", start: "11:00", end: "12:30" },
+    { label: "02:00 - 03:30 PM", start: "14:00", end: "15:30" },
+    { label: "04:00 - 05:30 PM", start: "16:00", end: "17:30" },
+    { label: "06:00 - 07:30 PM", start: "18:00", end: "19:30" },
+  ];
+
+  // New / edit entry form state
   const [formData, setFormData] = useState<{
     batch_id: string;
     subject: string;
@@ -81,7 +93,70 @@ export const Timetable: React.FC = () => {
     }
   };
 
-  const handleCreateEntry = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setFormData({
+      batch_id: batches[0]?.id || "",
+      subject: "",
+      day_of_week: "Monday",
+      start_time: "09:00",
+      end_time: "10:30",
+      teacher_id: teachers[0]?.id || "",
+      room_number: "Room 101",
+    });
+    setErrorNotice(null);
+    setIsModalOpen(true);
+  };
+
+  const handleStartEdit = (item: TimetableEntry) => {
+    setEditingId(item.id);
+    setFormData({
+      batch_id: item.batch_id,
+      subject: item.subject,
+      day_of_week: item.day_of_week as DayOfWeek,
+      start_time: item.start_time.slice(0, 5),
+      end_time: item.end_time.slice(0, 5),
+      teacher_id: item.teacher_id || "",
+      room_number: item.room_number || "Room 101",
+    });
+    setErrorNotice(null);
+    setIsModalOpen(true);
+  };
+
+  // Real-time conflict preview
+  const liveConflict = useMemo(() => {
+    if (!formData.day_of_week || !formData.start_time || !formData.end_time) return null;
+    const curStart = formData.start_time.length === 5 ? `${formData.start_time}:00` : formData.start_time;
+    const curEnd = formData.end_time.length === 5 ? `${formData.end_time}:00` : formData.end_time;
+
+    for (const item of entries) {
+      if (editingId && item.id === editingId) continue;
+      if (item.day_of_week !== formData.day_of_week) continue;
+
+      const isOverlap = curStart < item.end_time && curEnd > item.start_time;
+      if (isOverlap) {
+        if (formData.teacher_id && item.teacher_id === formData.teacher_id) {
+          return {
+            type: "faculty",
+            message: `Faculty Conflict: ${item.teacher_name} is already scheduled on ${item.day_of_week} for "${item.batch_name}" between ${item.start_time.slice(0, 5)} and ${item.end_time.slice(0, 5)}.`,
+          };
+        }
+        if (
+          formData.room_number &&
+          item.room_number &&
+          formData.room_number.toLowerCase().trim() === item.room_number.toLowerCase().trim()
+        ) {
+          return {
+            type: "room",
+            message: `Room Conflict: ${item.room_number} is already occupied on ${item.day_of_week} for "${item.batch_name}" between ${item.start_time.slice(0, 5)} and ${item.end_time.slice(0, 5)}.`,
+          };
+        }
+      }
+    }
+    return null;
+  }, [formData, entries, editingId]);
+
+  const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.batch_id || !formData.subject || !formData.start_time || !formData.end_time) {
       setErrorNotice("Please fill in all required fields.");
@@ -93,28 +168,47 @@ export const Timetable: React.FC = () => {
       return;
     }
 
+    if (liveConflict) {
+      setErrorNotice(liveConflict.message);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorNotice(null);
     setSuccessNotice(null);
 
-    const result = await timetableService.createEntry({
-      batch_id: formData.batch_id,
-      subject: formData.subject,
-      day_of_week: formData.day_of_week,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      teacher_id: formData.teacher_id || null,
-      room_number: formData.room_number || null,
-      is_active: true,
-    });
+    let result;
+    if (editingId) {
+      result = await timetableService.updateEntry(editingId, {
+        batch_id: formData.batch_id,
+        subject: formData.subject,
+        day_of_week: formData.day_of_week,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        teacher_id: formData.teacher_id || null,
+        room_number: formData.room_number || null,
+      });
+    } else {
+      result = await timetableService.createEntry({
+        batch_id: formData.batch_id,
+        subject: formData.subject,
+        day_of_week: formData.day_of_week,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        teacher_id: formData.teacher_id || null,
+        room_number: formData.room_number || null,
+        is_active: true,
+      });
+    }
 
     setIsSubmitting(false);
 
     if (result.error) {
       setErrorNotice(result.error);
     } else {
-      setSuccessNotice("Timetable slot added successfully.");
+      setSuccessNotice(editingId ? "Timetable slot updated successfully." : "Timetable slot added successfully.");
       setIsModalOpen(false);
+      setEditingId(null);
       loadData();
     }
   };
@@ -161,9 +255,9 @@ export const Timetable: React.FC = () => {
             <Button
               variant="primary"
               icon={<Plus size={16} />}
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleOpenCreate}
             >
-              Add Class Slot
+              Schedule Class Slot
             </Button>
           )}
         </div>
@@ -225,13 +319,22 @@ export const Timetable: React.FC = () => {
                             {item.start_time.slice(0, 5)} - {item.end_time.slice(0, 5)}
                           </span>
                           {canEdit && (
-                            <button
-                              onClick={() => handleDeleteEntry(item.id)}
-                              className="text-slate-300 hover:text-rose-500 transition"
-                              title="Delete Slot"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleStartEdit(item)}
+                                className="p-1 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded transition"
+                                title="Edit Slot"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteEntry(item.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                                title="Delete Slot"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -271,14 +374,17 @@ export const Timetable: React.FC = () => {
         </div>
       )}
 
-      {/* Add Slot Modal */}
+      {/* Schedule / Edit Slot Modal */}
       {isModalOpen && (
         <Modal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Schedule Class Slot"
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingId(null);
+          }}
+          title={editingId ? "Edit Class Slot" : "Schedule Class Slot"}
         >
-          <form onSubmit={handleCreateEntry} className="space-y-4">
+          <form onSubmit={handleSaveEntry} className="space-y-4">
             <Select
               label="Select Batch"
               required
@@ -290,7 +396,7 @@ export const Timetable: React.FC = () => {
             <Input
               label="Subject / Topic"
               required
-              placeholder="e.g. Physics - Mechanics"
+              placeholder="e.g. Physics - Electrostatics"
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
             />
@@ -306,10 +412,33 @@ export const Timetable: React.FC = () => {
 
               <Input
                 label="Room Number"
-                placeholder="e.g. Room 102"
+                placeholder="e.g. Room 101"
                 value={formData.room_number}
                 onChange={(e) => setFormData({ ...formData, room_number: e.target.value })}
               />
+            </div>
+
+            {/* Quick Presets */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Quick Time Presets:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_SLOTS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, start_time: p.start, end_time: p.end })}
+                    className={`px-2.5 py-1 text-[11px] rounded-md border transition font-medium ${
+                      formData.start_time === p.start && formData.end_time === p.end
+                        ? "bg-[#16466f] text-white border-[#16466f]"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -331,12 +460,12 @@ export const Timetable: React.FC = () => {
                 />
               </div>
               <p className="text-[11px] text-slate-400">
-                Format: 24-hour clock (e.g. 09:00 for 9 AM, 13:30 for 1:30 PM, 17:00 for 5 PM).
+                Format: 24-hour clock (e.g. 09:00 for 9 AM, 14:00 for 2 PM, 16:30 for 4:30 PM).
               </p>
             </div>
 
             <Select
-              label="Assigned Faculty (Optional)"
+              label="Assigned Faculty"
               options={[
                 { value: "", label: "No faculty assigned" },
                 ...teachers.map((t) => ({ value: t.id, label: `${t.full_name} (${t.subject})` })),
@@ -345,18 +474,27 @@ export const Timetable: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })}
             />
 
-            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
-              <span>
-                Automatic conflict detection will ensure the teacher and classroom are not booked for another batch at the same time.
-              </span>
-            </div>
+            {/* Real-time Conflict Alert */}
+            {liveConflict ? (
+              <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
+                <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                <span><b>Schedule Conflict Detected:</b> {liveConflict.message}</span>
+              </div>
+            ) : (
+              <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                <span>Slot is available with no faculty or room overlaps on {formData.day_of_week}.</span>
+              </div>
+            )}
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingId(null);
+                }}
               >
                 Cancel
               </Button>
@@ -364,9 +502,9 @@ export const Timetable: React.FC = () => {
                 type="submit"
                 variant="primary"
                 isLoading={isSubmitting}
-                icon={<CheckCircle2 size={16} />}
+                disabled={Boolean(liveConflict)}
               >
-                Save Schedule Slot
+                {editingId ? "Save Changes" : "Confirm & Schedule"}
               </Button>
             </div>
           </form>

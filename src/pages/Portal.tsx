@@ -17,6 +17,9 @@ import {
   Sparkles,
   Settings,
   GraduationCap,
+  Home,
+  Bell,
+  BookCheck,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { StatCard, Badge, LoadingSpinner, Button } from "../components/common";
@@ -26,19 +29,34 @@ import { academicsService } from "../services/academicsService";
 import { materialsService } from "../services/materialsService";
 import { timetableService } from "../services/timetableService";
 import { diaryService } from "../services/diaryService";
+import { announcementsService } from "../services/announcementsService";
 import { PrintableReceiptModal } from "../components/fees";
 import { supabase } from "../lib/supabase";
-import type { StudentAttendanceStats, FeeRecord } from "../types";
+import type { StudentAttendanceStats, FeeRecord, Announcement } from "../types";
 import type { StudentExamResult } from "../types/academics";
 import type { StudyMaterial } from "../types/materials";
 import type { TimetableEntry } from "../types/timetable";
-import type { StudentStreak, StudentBadge, StudentPointsRecord, StudentCertificate } from "../types/diary";
+import type {
+  StudentStreak,
+  StudentBadge,
+  StudentPointsRecord,
+  StudentCertificate,
+  ClassSession,
+} from "../types/diary";
 
 export const Portal: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    "attendance" | "exams" | "fees" | "materials" | "timetable" | "gamification" | "certificates"
-  >("attendance");
+    | "overview"
+    | "homework"
+    | "attendance"
+    | "exams"
+    | "fees"
+    | "materials"
+    | "timetable"
+    | "gamification"
+    | "certificates"
+  >("overview");
 
   const [studentInfo, setStudentInfo] = useState<{
     id: string;
@@ -64,6 +82,8 @@ export const Portal: React.FC = () => {
   const [examResults, setExamResults] = useState<StudentExamResult[]>([]);
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
+  const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [gamification, setGamification] = useState<{
     streak: StudentStreak | null;
     badges: StudentBadge[];
@@ -87,7 +107,7 @@ export const Portal: React.FC = () => {
 
     setLoading(true);
     try {
-      // Find the student profile matching current user or demo fallback
+      // Find the student profile matching current user
       const { data: studentData } = await supabase
         .from("students")
         .select("id, full_name, admission_no, batch_id, batches(name, course_name)")
@@ -113,14 +133,27 @@ export const Portal: React.FC = () => {
           course_name: (targetStudent.batches as any)?.course_name || "Enrolled Course",
         });
 
-        // Parallel fetch for attendance, fees, exams, materials, timetable, gamification, and certificates
-        const [statsRes, logsRes, feesRes, examsRes, matRes, timeRes, gamifyRes, certRes] = await Promise.all([
+        // Parallel fetch for attendance, fees, exams, materials, timetable, sessions, announcements, gamification, and certificates
+        const [
+          statsRes,
+          logsRes,
+          feesRes,
+          examsRes,
+          matRes,
+          timeRes,
+          sessionsRes,
+          annRes,
+          gamifyRes,
+          certRes,
+        ] = await Promise.all([
           attendanceService.getStudentAttendanceSummary(targetStudentId).catch(() => null),
           attendanceService.getStudentRecentAttendance(targetStudentId, 10).catch(() => []),
           feesService.getStudentFeeRecords(targetStudentId).catch(() => []),
           academicsService.getStudentExamResults(targetStudentId).catch(() => []),
           materialsService.getStudyMaterials(targetStudent.batch_id).catch(() => ({ data: [] })),
           timetableService.getTimetable(targetStudent.batch_id).catch(() => ({ data: [] })),
+          diaryService.getClassSessions(targetStudent.batch_id).catch(() => ({ data: [] })),
+          announcementsService.getAnnouncements(targetStudent.batch_id).catch(() => ({ data: [] })),
           diaryService.getStudentGamification(targetStudentId).catch(() => ({ streak: null, badges: [], points: [], totalPoints: 0 })),
           diaryService.getStudentCertificates(targetStudentId).catch(() => []),
         ]);
@@ -131,6 +164,8 @@ export const Portal: React.FC = () => {
         setExamResults(examsRes);
         setMaterials(matRes.data);
         setTimetable(timeRes.data);
+        setClassSessions(sessionsRes.data || []);
+        setAnnouncements(annRes.data || []);
         setGamification(gamifyRes);
         setCertificates(certRes);
       }
@@ -149,6 +184,20 @@ export const Portal: React.FC = () => {
   const attendedSessions = attendanceStats?.attended_sessions ?? 0;
   const attendanceRate = attendanceStats?.percentage ?? 100;
   const isDefaulter = attendanceStats?.is_defaulter ?? false;
+
+  const currentDayName = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ][new Date().getDay()];
+
+  const todayClasses = timetable
+    .filter((t) => t.day_of_week.toLowerCase() === currentDayName.toLowerCase())
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Fee calculation
   const totalFeeBilled = feeRecords.reduce((acc, r) => acc + r.amount, 0);
@@ -250,6 +299,30 @@ export const Portal: React.FC = () => {
       {/* Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto">
         <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "overview"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Home size={16} />
+          Daily Home
+        </button>
+
+        <button
+          onClick={() => setActiveTab("homework")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
+            activeTab === "homework"
+              ? "border-[#16466f] text-[#16466f]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <BookCheck size={16} />
+          Homework & Lessons ({classSessions.length})
+        </button>
+
+        <button
           onClick={() => setActiveTab("attendance")}
           className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
             activeTab === "attendance"
@@ -333,6 +406,249 @@ export const Portal: React.FC = () => {
           Certificates ({certificates.length})
         </button>
       </div>
+
+      {/* Tab: Overview (Daily Home) */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Attendance Compliance"
+              value={`${attendanceRate.toFixed(0)}%`}
+              delta={isDefaulter ? "Action Needed" : "Compliant"}
+              note={`${attendedSessions} of ${totalSessions} lectures`}
+              icon={ClipboardCheck}
+              tone={isDefaulter ? "rose" : "green"}
+            />
+            <StatCard
+              title="Study Streak"
+              value={`${gamification.streak?.current_attendance_streak || 0} Days`}
+              note="Consecutive active days"
+              icon={Flame}
+              tone="amber"
+            />
+            <StatCard
+              title="Exams Evaluated"
+              value={String(examResults.length)}
+              note="Assessment tests recorded"
+              icon={Award}
+              tone="violet"
+            />
+            <StatCard
+              title="Outstanding Dues"
+              value={`₹${totalFeeDue.toLocaleString()}`}
+              note={totalFeeDue > 0 ? "Pending payment" : "All cleared"}
+              icon={IndianRupee}
+              tone={totalFeeDue > 0 ? "amber" : "blue"}
+            />
+          </div>
+
+          {/* Today's Schedule & Notice Board */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Today's Classes */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="text-[#16466f]" size={18} />
+                  <h3 className="font-bold text-slate-800 text-sm">
+                    Today's Classes ({currentDayName})
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setActiveTab("timetable")}
+                  className="text-xs font-bold text-[#16466f] hover:underline"
+                >
+                  Full Week →
+                </button>
+              </div>
+
+              {todayClasses.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 italic">
+                  No classes scheduled for your batch today. Perfect time for revision & homework!
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {todayClasses.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-800 text-xs">{item.subject}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {item.teacher_name || "Faculty"} • {item.room_number || "Room 101"}
+                        </div>
+                      </div>
+                      <Badge variant="blue" size="sm">
+                        {item.start_time.slice(0, 5)} - {item.end_time.slice(0, 5)}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Institute Announcements */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Bell className="text-[#16466f]" size={18} />
+                  <h3 className="font-bold text-slate-800 text-sm">Notice Board & Broadcasts</h3>
+                </div>
+                <Badge variant="neutral" size="sm">
+                  {announcements.length} Notices
+                </Badge>
+              </div>
+
+              {announcements.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 italic">
+                  No announcements broadcasted yet.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {announcements.slice(0, 3).map((a) => (
+                    <div
+                      key={a.id}
+                      className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-1"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-slate-900">{a.title}</span>
+                        <span className="text-slate-400 text-[10px]">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                        {a.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Homework & Class Diary Lessons */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Recent Class Lectures & Assigned Homework</h3>
+                <p className="text-xs text-slate-500">Official class diary entries submitted by your faculty</p>
+              </div>
+              <button
+                onClick={() => setActiveTab("homework")}
+                className="text-xs font-bold text-[#16466f] hover:underline"
+              >
+                View All Diaries ({classSessions.length}) →
+              </button>
+            </div>
+
+            {classSessions.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400 italic">
+                No class diary records submitted yet for this batch.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {classSessions.slice(0, 4).map((sess) => (
+                  <div
+                    key={sess.id}
+                    className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-2 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                        <span className="font-bold text-[#16466f]">{sess.subject}</span>
+                        <span className="text-slate-400 text-[11px]">{sess.session_date}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        {sess.diary?.chapter_name || "Conducted Lecture"}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                        <b>Topics:</b> {sess.diary?.topics_covered || "Classroom lecture completed."}
+                      </p>
+                    </div>
+
+                    {sess.diary?.homework_notes && (
+                      <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
+                        <span className="font-bold block text-[10px] uppercase text-amber-700">Homework Assigned:</span>
+                        <p className="mt-0.5 leading-snug">{sess.diary.homework_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Homework & Class Diary */}
+      {activeTab === "homework" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div className="border-b border-slate-100 pb-4 mb-4">
+              <h3 className="font-bold text-slate-800 text-base">All Class Diary Entries & Homework</h3>
+              <p className="text-xs text-slate-500">
+                Track every lecture taught, topics covered, and assigned homework in your batch.
+              </p>
+            </div>
+
+            {classSessions.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 italic">
+                No class diary sessions found for your batch.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {classSessions.map((sess) => (
+                  <div key={sess.id} className="py-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#16466f] text-sm">{sess.subject}</span>
+                        <Badge variant="blue" size="sm">{sess.teacher_name}</Badge>
+                      </div>
+                      <span className="text-slate-400 font-mono text-[11px]">{sess.session_date}</span>
+                    </div>
+
+                    {sess.diary ? (
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/80 text-xs space-y-1.5">
+                        <div>
+                          <b className="text-slate-800">Chapter: </b>
+                          <span className="text-slate-700">{sess.diary.chapter_name || "Standard Chapter"}</span>
+                        </div>
+                        <div>
+                          <b className="text-slate-800">Topics Covered: </b>
+                          <span className="text-slate-600">{sess.diary.topics_covered || "Lecture delivered"}</span>
+                        </div>
+                        {sess.diary.teaching_remarks && (
+                          <div>
+                            <b className="text-slate-800">Teacher Remarks: </b>
+                            <span className="text-slate-500 italic">{sess.diary.teaching_remarks}</span>
+                          </div>
+                        )}
+                        {sess.diary.homework_notes && (
+                          <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-md text-amber-900">
+                            <b className="text-amber-800 block text-[11px] uppercase tracking-wide">
+                              Assigned Homework:
+                            </b>
+                            <p className="mt-0.5">{sess.diary.homework_notes}</p>
+                          </div>
+                        )}
+                        {sess.diary.next_planned_topic && (
+                          <div className="text-[11px] text-slate-500 pt-1">
+                            <b>Next Planned Topic: </b> {sess.diary.next_planned_topic}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">
+                        Lecture conducted; awaiting diary submission by faculty.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tab 1: Attendance */}
       {activeTab === "attendance" && (

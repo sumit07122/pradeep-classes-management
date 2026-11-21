@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Receipt,
   Briefcase,
+  Database,
   X,
   ChevronDown,
   LogOut,
@@ -136,6 +137,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Reports",
     path: "/reports",
     icon: FileSpreadsheet,
+    roles: ["super_admin", "owner", "admin"],
+  },
+  {
+    label: "Data Migration",
+    path: "/migration",
+    icon: Database,
     roles: ["super_admin", "owner", "admin"],
   },
   {
