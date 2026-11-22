@@ -12,7 +12,8 @@
     "test:onboarding": "npx tsx src/tests/inlineUserProvisioning.test.ts",
     "test:auth": "npx tsx src/tests/authRedirect.test.ts",
     "test:pwa": "npx tsx src/tests/pwa.test.ts",
-    "test:backup": "npx tsx src/tests/backupService.test.ts"
+    "test:backup": "npx tsx src/tests/backupService.test.ts",
+    "test:lifecycle": "npx tsx src/tests/erpLifecycleServices.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

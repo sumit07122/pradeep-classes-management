@@ -1,7 +1,17 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import type { Teacher, TeacherSalaryConfigData } from "../types";
+import type { Teacher, TeacherSalaryConfigData, TeacherStatus } from "../types";
 
 const INSTITUTE_ID = "11111111-2222-3333-4444-555555555555";
+
+let mockClient: any = null;
+
+export function setSupabaseClient(client: any) {
+  mockClient = client;
+}
+
+function getClient(): any {
+  return mockClient || supabase;
+}
 
 export const teachersService = {
   async getTeachers(): Promise<{ data: Teacher[]; error?: string; isDemo: boolean }> {
@@ -204,47 +214,78 @@ export const teachersService = {
     }
   },
 
-  async deleteTeacher(id: string): Promise<{ success: boolean; error?: string }> {
-    if (!isSupabaseConfigured || !supabase) {
+  async deleteTeacher(
+    id: string,
+    forceCascade: boolean = false
+  ): Promise<{ success: boolean; error?: string; message?: string }> {
+    const client = getClient();
+    if (!client) {
       return { success: false, error: "Database service is not configured." };
     }
 
     try {
-      // 1. Check if teacher has conducted class sessions
-      const { count: sessionCount, error: countErr } = await supabase
-        .from("class_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("teacher_id", id);
+      const { data, error } = await client.rpc("admin_delete_teacher", {
+        p_teacher_id: id,
+        p_force_cascade: forceCascade,
+      });
 
-      if (countErr) throw countErr;
-      if (sessionCount && sessionCount > 0) {
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data && typeof data === "object" && data.success === false) {
         return {
           success: false,
-          error: `Cannot delete faculty member with ${sessionCount} recorded class session(s). Please deactivate them instead to preserve historical academic records.`,
+          error: data.error || data.message || "Failed to delete teacher",
         };
       }
 
-      // 2. Check if teacher has historical payroll disbursements
-      const { count: payrollCount, error: payrollErr } = await supabase
-        .from("teacher_payrolls")
-        .select("id", { count: "exact", head: true })
-        .eq("teacher_id", id);
+      return {
+        success: true,
+        message: data?.message || "Faculty member deleted successfully",
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete teacher" };
+    }
+  },
 
-      if (payrollErr) throw payrollErr;
-      if (payrollCount && payrollCount > 0) {
-        return {
-          success: false,
-          error: `Cannot delete faculty member with ${payrollCount} historical payroll record(s). Please deactivate them instead to preserve financial and tax records.`,
-        };
+  async updateTeacherStatus(
+    id: string,
+    status: TeacherStatus,
+    reason?: string,
+    relievingDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = getClient();
+    if (!client) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const payload: any = {
+        status,
+        status_reason: reason || null,
+        status_changed_at: new Date().toISOString(),
+        is_active: status === "active",
+        relieving_date:
+          relievingDate ||
+          (status === "relieved" ? new Date().toISOString().split("T")[0] : null),
+      };
+
+      const { error } = await client
+        .from("teachers")
+        .update(payload)
+        .eq("id", id);
+
+      if (error) {
+        return { success: false, error: error.message };
       }
-
-      // 3. Delete teacher (cascades to teacher_batches and teacher_salary_configs)
-      const { error } = await supabase.from("teachers").delete().eq("id", id);
-      if (error) throw error;
 
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || "Failed to delete teacher" };
+      return {
+        success: false,
+        error: err?.message || "Failed to update teacher status",
+      };
     }
   },
 
@@ -312,4 +353,8 @@ export const teachersService = {
       return { success: false, error: err.message };
     }
   },
+  setSupabaseClient,
 };
+
+export const deleteTeacher = teachersService.deleteTeacher;
+export const updateTeacherStatus = teachersService.updateTeacherStatus;

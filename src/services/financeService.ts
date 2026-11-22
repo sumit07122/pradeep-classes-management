@@ -12,6 +12,16 @@ import type {
   DisbursePayrollPayload,
 } from "../types/finance";
 
+let mockClient: any = null;
+
+export function setSupabaseClient(client: any) {
+  mockClient = client;
+}
+
+function getClient(): any {
+  return mockClient || getSupabase();
+}
+
 const INSTITUTE_ID = "11111111-2222-3333-4444-555555555555";
 
 /**
@@ -472,3 +482,68 @@ export async function disbursePayroll(
     throw new Error(error.message || "Failed to process payroll disbursement");
   }
 }
+
+/**
+ * Permanently delete an erroneous or duplicate teacher payroll record atomically.
+ * Automatically cleans up any associated institute expense row.
+ */
+export async function deleteTeacherPayroll(
+  payrollId: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    if (!payrollId || typeof payrollId !== "string" || payrollId.trim() === "") {
+      return { success: false, error: "Payroll ID is required." };
+    }
+
+    const client = getClient();
+    if (!client) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    const { data, error } = await client.rpc("admin_delete_payroll_record", {
+      p_payroll_id: payrollId.trim(),
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data && typeof data === "object" && data.success === false) {
+      return {
+        success: false,
+        error: data.error || data.message || "Failed to delete payroll record",
+      };
+    }
+
+    return {
+      success: true,
+      message: data?.message || "Payroll record deleted successfully",
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Failed to delete payroll record",
+    };
+  }
+}
+
+export const financeService = {
+  getFinancialDashboard,
+  getIncomes,
+  createIncome,
+  updateIncome,
+  deleteIncome,
+  reverseIncome,
+  getExpenses,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  reverseExpense,
+  getTeacherPayrolls,
+  getTeacherSalaryConfigs,
+  updateTeacherSalaryConfig,
+  generateMonthlyPayroll,
+  disbursePayroll,
+  deleteTeacherPayroll,
+  setSupabaseClient,
+};

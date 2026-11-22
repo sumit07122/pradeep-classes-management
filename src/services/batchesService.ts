@@ -1,6 +1,16 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import type { Batch, Student } from "../types";
 
+let mockClient: any = null;
+
+export function setSupabaseClient(client: any) {
+  mockClient = client;
+}
+
+function getClient(): any {
+  return mockClient || supabase;
+}
+
 export const batchesService = {
   async getBatches(): Promise<{ data: Batch[]; error?: string; isDemo: boolean }> {
     if (!isSupabaseConfigured || !supabase) {
@@ -303,4 +313,42 @@ export const batchesService = {
       return { success: false, error: err?.message || "Failed to assign teachers" };
     }
   },
+
+  async deleteBatch(
+    id: string,
+    forceCascade: boolean = false
+  ): Promise<{ success: boolean; error?: string; message?: string }> {
+    const client = getClient();
+    if (!client) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const { data, error } = await client.rpc("admin_delete_batch", {
+        p_batch_id: id,
+        p_force_cascade: forceCascade,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data && typeof data === "object" && data.success === false) {
+        return {
+          success: false,
+          error: data.error || data.message || "Failed to delete batch",
+        };
+      }
+
+      return {
+        success: true,
+        message: data?.message || "Batch deleted successfully",
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete batch" };
+    }
+  },
+  setSupabaseClient,
 };
+
+export const deleteBatch = batchesService.deleteBatch;

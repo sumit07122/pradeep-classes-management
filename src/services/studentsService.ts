@@ -1,5 +1,15 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import type { Student, StudentFilterParams, StudentBatchHistory } from "../types";
+import type { Student, StudentFilterParams, StudentBatchHistory, StudentStatus } from "../types";
+
+let mockClient: any = null;
+
+export function setSupabaseClient(client: any) {
+  mockClient = client;
+}
+
+function getClient(): any {
+  return mockClient || supabase;
+}
 
 export interface LiveBatchOption {
   id: string;
@@ -416,4 +426,90 @@ export const studentsService = {
       return { data: [], error: err?.message || "Failed to fetch student transfer history" };
     }
   },
+
+  async deleteStudent(
+    id: string,
+    forceCascade: boolean = false
+  ): Promise<{ success: boolean; error?: string; message?: string }> {
+    const client = getClient();
+    if (!client) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const { data, error } = await client.rpc("admin_delete_student", {
+        p_student_id: id,
+        p_force_cascade: forceCascade,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data && typeof data === "object" && data.success === false) {
+        return {
+          success: false,
+          error: data.error || data.message || "Failed to delete student",
+        };
+      }
+
+      return {
+        success: true,
+        message: data?.message || "Student deleted successfully",
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete student" };
+    }
+  },
+
+  async updateStudentStatus(
+    id: string,
+    status: StudentStatus,
+    reason?: string,
+    exitDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = getClient();
+    if (!client) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const normalizedStatus = status.toLowerCase().replace(/\s+/g, "_");
+      const isExitStatus = [
+        "alumni",
+        "rusticated",
+        "dropped_out",
+        "archived",
+      ].includes(normalizedStatus);
+
+      const payload: any = {
+        status: normalizedStatus,
+        status_reason: reason || null,
+        status_changed_at: new Date().toISOString(),
+        exit_date:
+          exitDate ||
+          (isExitStatus ? new Date().toISOString().split("T")[0] : null),
+      };
+
+      const { error } = await client
+        .from("students")
+        .update(payload)
+        .eq("id", id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || "Failed to update student status",
+      };
+    }
+  },
+  setSupabaseClient,
 };
+
+export const deleteStudent = studentsService.deleteStudent;
+export const updateStudentStatus = studentsService.updateStudentStatus;

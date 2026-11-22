@@ -1,4 +1,15 @@
-export type StudentStatus = "Active" | "Inactive" | "On hold";
+export type StudentStatus =
+  | "active"
+  | "on_hold"
+  | "alumni"
+  | "rusticated"
+  | "dropped_out"
+  | "archived"
+  | "Active"
+  | "Inactive"
+  | "On hold";
+
+export type TeacherStatus = "active" | "on_leave" | "relieved";
 export type BatchStatus = "active" | "completed" | "archived";
 
 export interface Student {
@@ -23,6 +34,9 @@ export interface Student {
   notes?: string;
   photo_url?: string;
   status: StudentStatus;
+  status_reason?: string;
+  status_changed_at?: string;
+  exit_date?: string;
   joined_on?: string;
   created_at?: string;
   updated_at?: string;
@@ -45,6 +59,10 @@ export interface Teacher {
   email?: string;
   assigned_batches: string[];
   is_active?: boolean;
+  status?: TeacherStatus;
+  status_reason?: string;
+  status_changed_at?: string;
+  relieving_date?: string;
   institute_id?: string;
   is_demo?: boolean;
   salary_config?: TeacherSalaryConfigData;
