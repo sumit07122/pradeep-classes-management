@@ -102,12 +102,16 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
-  -- 2. Validate role
+  -- 2. Validate role & prevent privilege escalation
   BEGIN
     v_role := p_role::public.app_role;
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Invalid role: %', p_role;
   END;
+
+  IF v_role = 'super_admin' AND v_caller_role != 'super_admin' THEN
+    RAISE EXCEPTION 'Unauthorized: Only a super_admin can provision a super_admin';
+  END IF;
 
   IF v_role = 'owner' AND v_caller_role NOT IN ('owner', 'super_admin') THEN
     RAISE EXCEPTION 'Unauthorized: Only an owner can provision another owner';
@@ -116,13 +120,44 @@ BEGIN
   -- 3. Resolve institute ID
   v_inst_id := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
 
-  -- 4. Clean phone
+  -- 4. Validate linkage constraints
+  IF p_student_id IS NOT NULL AND p_teacher_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Cannot link user to both student and teacher record';
+  END IF;
+
+  IF p_student_id IS NOT NULL AND v_role != 'student' THEN
+    RAISE EXCEPTION 'Cannot link student record to non-student user';
+  END IF;
+
+  IF p_teacher_id IS NOT NULL AND v_role != 'teacher' THEN
+    RAISE EXCEPTION 'Cannot link teacher record to non-teacher user';
+  END IF;
+
+  IF p_student_id IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM public.students WHERE id = p_student_id AND institute_id = v_inst_id) THEN
+      RAISE EXCEPTION 'Student record not found in this institute';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.students WHERE id = p_student_id AND profile_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'Student record is already linked to another user account';
+    END IF;
+  END IF;
+
+  IF p_teacher_id IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM public.teachers WHERE id = p_teacher_id AND institute_id = v_inst_id) THEN
+      RAISE EXCEPTION 'Teacher record not found in this institute';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.teachers WHERE id = p_teacher_id AND profile_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'Teacher record is already linked to another user account';
+    END IF;
+  END IF;
+
+  -- 5. Clean phone
   v_phone := nullif(trim(p_phone), '');
   IF v_phone IS NOT NULL AND EXISTS (SELECT 1 FROM auth.users WHERE phone = v_phone) THEN
     RAISE EXCEPTION 'User with phone % already exists', v_phone;
   END IF;
 
-  -- 5. Resolve email
+  -- 6. Resolve email & sanitize synthetic admission email
   IF p_email IS NULL OR trim(p_email) = '' THEN
     IF p_student_id IS NOT NULL THEN
       SELECT admission_no INTO v_admission_no
@@ -132,7 +167,7 @@ BEGIN
       IF v_admission_no IS NULL THEN
         RAISE EXCEPTION 'Student not found in this institute';
       END IF;
-      v_email := lower(v_admission_no) || '@pradeepclasses.in';
+      v_email := regexp_replace(lower(trim(v_admission_no)), '[^a-z0-9_-]', '-', 'g') || '@pradeepclasses.in';
     ELSE
       RAISE EXCEPTION 'Email is required';
     END IF;
@@ -140,27 +175,14 @@ BEGIN
     v_email := lower(trim(p_email));
   END IF;
 
-  -- 6. Check if user with email already exists
+  -- 7. Check if user with email already exists
   IF EXISTS (SELECT 1 FROM auth.users WHERE lower(email) = v_email) THEN
     RAISE EXCEPTION 'User with email % already exists', v_email;
   END IF;
 
-  -- 7. Validate password
+  -- 8. Validate password
   IF p_password IS NULL OR length(p_password) < 6 THEN
     RAISE EXCEPTION 'Password must be at least 6 characters long';
-  END IF;
-
-  -- 8. Validate linked student/teacher if provided
-  IF p_student_id IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE id = p_student_id AND institute_id = v_inst_id) THEN
-      RAISE EXCEPTION 'Student record not found in this institute';
-    END IF;
-  END IF;
-
-  IF p_teacher_id IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM public.teachers WHERE id = p_teacher_id AND institute_id = v_inst_id) THEN
-      RAISE EXCEPTION 'Teacher record not found in this institute';
-    END IF;
   END IF;
 
   -- 9. Hash password using pgcrypto
@@ -172,7 +194,7 @@ BEGIN
   PERFORM set_config('institute.target_institute_id', v_inst_id::text, true);
   PERFORM set_config('institute.target_role', v_role::text, true);
 
-  -- 11. Insert into auth.users
+  -- 11. Insert into auth.users (without generated column confirmed_at)
   INSERT INTO auth.users (
     instance_id,
     id,
@@ -207,7 +229,7 @@ BEGIN
     false
   );
 
-  -- 12. Insert into auth.identities for GoTrue auth compatibility
+  -- 12. Insert into auth.identities for GoTrue auth compatibility (without generated column email)
   INSERT INTO auth.identities (
     id,
     user_id,
@@ -275,6 +297,9 @@ BEGIN
     v_inst_id
   );
 
+  -- 16. GUC State Cleanup
+  PERFORM set_config('institute.internal_bootstrap_in_progress', 'false', true);
+
   RETURN jsonb_build_object(
     'status', 'success',
     'message', 'User provisioned successfully',
@@ -318,7 +343,7 @@ BEGIN
   -- 2. Resolve caller institute ID
   v_inst_id := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
 
-  -- 3. Verify target profile
+  -- 3. Verify target profile & prevent privilege escalation
   SELECT institute_id, role INTO v_target_inst, v_target_role
   FROM public.profiles
   WHERE id = p_user_id;
@@ -329,6 +354,10 @@ BEGIN
 
   IF v_target_inst IS DISTINCT FROM v_inst_id AND v_caller_role != 'super_admin' THEN
     RAISE EXCEPTION 'Unauthorized: Cross-tenant password reset prohibited';
+  END IF;
+
+  IF v_target_role = 'super_admin' AND v_caller_role != 'super_admin' THEN
+    RAISE EXCEPTION 'Unauthorized: Only a super_admin can reset a super_admin password';
   END IF;
 
   IF v_target_role = 'owner' AND v_caller_role NOT IN ('owner', 'super_admin') THEN
@@ -381,7 +410,7 @@ CREATE OR REPLACE FUNCTION public.admin_toggle_user_status(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -398,7 +427,7 @@ BEGIN
   -- 2. Resolve caller institute ID
   v_inst_id := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
 
-  -- 3. Verify target profile
+  -- 3. Verify target profile & prevent privilege escalation
   SELECT institute_id, role INTO v_target_inst, v_target_role
   FROM public.profiles
   WHERE id = p_user_id;
@@ -415,6 +444,10 @@ BEGIN
     RAISE EXCEPTION 'Cannot toggle active status of yourself';
   END IF;
 
+  IF v_target_role = 'super_admin' AND v_caller_role != 'super_admin' THEN
+    RAISE EXCEPTION 'Unauthorized: Only a super_admin can modify a super_admin status';
+  END IF;
+
   IF v_target_role = 'owner' AND v_caller_role NOT IN ('owner', 'super_admin') THEN
     RAISE EXCEPTION 'Unauthorized: Only an owner can modify an owner status';
   END IF;
@@ -429,7 +462,13 @@ BEGIN
   SET is_active = p_is_active
   WHERE profile_id = p_user_id;
 
-  -- 6. Audit log entry
+  -- 6. Synchronize auth.users banned_until for GoTrue login rejection
+  UPDATE auth.users
+  SET banned_until = CASE WHEN p_is_active THEN NULL ELSE '2099-01-01 00:00:00+00'::timestamptz END,
+      updated_at = now()
+  WHERE id = p_user_id;
+
+  -- 7. Audit log entry
   INSERT INTO public.audit_logs (actor_id, action, table_name, record_id, after_data, institute_id)
   VALUES (
     auth.uid(),
