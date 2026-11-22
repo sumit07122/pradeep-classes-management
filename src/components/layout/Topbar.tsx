@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Menu, CalendarDays, Bell, LogOut } from "lucide-react";
 import type { UserRole } from "../../types";
 import { NotificationDrawer } from "./NotificationDrawer";
+import { PWAInstallPrompt } from "../common/PWAInstallPrompt";
 
 export interface TopbarProps {
   onOpenMobileNav: () => void;
@@ -50,7 +51,9 @@ export const Topbar: React.FC<TopbarProps> = ({
         </div>
       </div>
 
-      <div className="top-actions flex items-center gap-4">
+      <div className="top-actions flex items-center gap-3 sm:gap-4">
+        <PWAInstallPrompt />
+
         <div className="today">
           <CalendarDays size={15} />
           <span>{todayFormatted}</span>

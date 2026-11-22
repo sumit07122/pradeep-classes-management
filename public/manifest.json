@@ -1,21 +1,27 @@
 {
   "short_name": "Pradeep Classes",
   "name": "Pradeep Classes — Institute Management Platform",
+  "description": "Premier Coaching Institute Management System for students, teachers, and administration.",
   "icons": [
     {
       "src": "/logo.png",
       "type": "image/png",
-      "sizes": "320x320"
+      "sizes": "192x192 320x320 512x512",
+      "purpose": "any maskable"
     },
     {
       "src": "/favicon.svg",
       "type": "image/svg+xml",
-      "sizes": "320x320"
+      "sizes": "320x320 512x512",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
+  "id": "/",
+  "scope": "/",
   "background_color": "#f0f4f9",
-  "theme_color": "#123b66",
+  "theme_color": "#102f50",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "categories": ["education", "productivity", "management"]
 }
