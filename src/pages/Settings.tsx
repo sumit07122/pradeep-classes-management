@@ -15,12 +15,15 @@ import { settingsService } from "../services/settingsService";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 import type { InstituteSettings, WhatsAppSettings } from "../types/settings";
+import { UserManagementTab } from "../components/users/UserManagementTab";
 
-export const Settings: React.FC = () => {
+export const Settings: React.FC<{ initialLoading?: boolean }> = ({
+  initialLoading = false,
+}) => {
   const { role, user } = useAuth();
   const isManagement = ["super_admin", "owner", "admin"].includes(role);
 
-  const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp">(
+  const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp" | "users">(
     isManagement ? "my-profile" : "my-profile"
   );
 
@@ -37,7 +40,7 @@ export const Settings: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialLoading);
   const [isSaving, setIsSaving] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
@@ -248,6 +251,17 @@ export const Settings: React.FC = () => {
 
         {isManagement && (
           <>
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "users"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Users size={17} />
+              User Accounts & Logins
+            </button>
             <button
               onClick={() => setActiveTab("profile")}
               className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
@@ -705,6 +719,11 @@ export const Settings: React.FC = () => {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* TAB 4: User Accounts & Logins (Admin, Owner, Super Admin) */}
+      {isManagement && activeTab === "users" && (
+        <UserManagementTab />
       )}
     </div>
   );
