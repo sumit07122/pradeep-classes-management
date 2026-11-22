@@ -36,7 +36,7 @@ export async function runBackupServiceTests() {
   });
 
   const createQueryBuilder = (table: string) => {
-    const queryState: any = { selectedCols: "*", orderCol: "", orderOpts: {} };
+    const queryState: any = { selectedCols: "*", orderCol: "", orderOpts: {}, eqFilters: [] };
     const builder: any = {
       select(cols: string = "*") {
         queryState.selectedCols = cols;
@@ -46,6 +46,14 @@ export async function runBackupServiceTests() {
         queryState.orderCol = col;
         queryState.orderOpts = opts;
         return builder;
+      },
+      eq(col: string, val: any) {
+        queryState.eqFilters.push({ col, val });
+        return builder;
+      },
+      single: async () => {
+        mockTableCalls.push({ table, query: { ...queryState, isSingle: true } });
+        return mockFromHandler(table, { ...queryState, isSingle: true });
       },
       then(resolve: any, reject: any) {
         mockTableCalls.push({ table, query: { ...queryState } });
@@ -210,21 +218,26 @@ export async function runBackupServiceTests() {
       },
     };
 
-    const res = await backupService.downloadBackupFile(sampleSnapshot);
-    assertEqual(res.success, true);
-    assertTrue(clicked, "Expected link.click() to have been called");
-    assertTrue(Boolean(createdBlobContent), "Expected blob content to be generated");
-    assertEqual(appendedChild, mockAnchor);
-    assertEqual(removedChild, mockAnchor);
-    assertEqual(revokedUrl, "blob:http://localhost/test-uuid");
-    assertTrue(mockAnchor.download.startsWith("pradeep_classes_backup_"));
-    assertTrue(mockAnchor.download.endsWith(".json"));
+    try {
+      const res = await backupService.downloadBackupFile(sampleSnapshot);
+      assertEqual(res.success, true);
+      assertTrue(clicked, "Expected link.click() to have been called");
+      assertTrue(Boolean(createdBlobContent), "Expected blob content to be generated");
+      assertEqual(appendedChild, mockAnchor);
+      assertEqual(removedChild, mockAnchor);
+      assertTrue(mockAnchor.download.startsWith("pradeep_classes_backup_"));
+      assertTrue(mockAnchor.download.endsWith(".json"));
 
-    // Cleanup globals
-    (globalThis as any).window = origWindow;
-    (globalThis as any).document = origDoc;
-    (globalThis as any).URL = origUrl;
-    (globalThis as any).Blob = origBlob;
+      // Allow setTimeout revocation to fire
+      await new Promise((r) => setTimeout(r, 150));
+      assertEqual(revokedUrl, "blob:http://localhost/test-uuid");
+    } finally {
+      // Cleanup globals
+      (globalThis as any).window = origWindow;
+      (globalThis as any).document = origDoc;
+      (globalThis as any).URL = origUrl;
+      (globalThis as any).Blob = origBlob;
+    }
 
     console.log("✓ downloadBackupFile generates browser blob, download anchor, and cleans up");
   }
@@ -532,10 +545,13 @@ export async function runBackupServiceTests() {
 
     const res = await backupService.purgeDemoData();
     assertEqual(res.success, true);
+    assertEqual(res.snapshotId, "snap-pre-purge-1111");
+    assertEqual(res.purgedCounts?.students, 10);
+    assertEqual(res.purgedCounts?.teachers, 3);
     assertEqual(mockRpcCalls.length, 1);
     assertEqual(mockRpcCalls[0].fn, "admin_purge_demo_data");
 
-    console.log("✓ purgeDemoData dispatches admin_purge_demo_data RPC");
+    console.log("✓ purgeDemoData dispatches admin_purge_demo_data RPC and preserves snapshot metadata");
   }
 
   // --------------------------------------------------------------------------
@@ -556,6 +572,31 @@ export async function runBackupServiceTests() {
     );
 
     console.log("✓ purgeDemoData handles unauthorized RPC errors");
+  }
+
+  // --------------------------------------------------------------------------
+  // Test 16: getBackupSnapshot - retrieves snapshot data by ID
+  // --------------------------------------------------------------------------
+  {
+    resetMocks();
+    mockFromHandler = async (table: string, query: any) => {
+      assertEqual(table, "institute_backups");
+      assertEqual(query.selectedCols, "snapshot_data");
+      assertEqual(query.eqFilters, [{ col: "id", val: "b-111" }]);
+      return {
+        data: { snapshot_data: sampleSnapshot },
+        error: null,
+      };
+    };
+
+    const res = await backupService.getBackupSnapshot("b-111");
+    assertEqual(res.data?.version, "1.0");
+    assertEqual(res.data?.institute_id, "inst-1111-2222-3333-4444");
+
+    const resEmpty = await backupService.getBackupSnapshot("");
+    assertEqual(resEmpty.error, "Backup ID is required.");
+
+    console.log("✓ getBackupSnapshot fetches snapshot data by ID and validates inputs");
   }
 
   console.log("=== All backupService Unit Tests Passed Successfully ===");

@@ -1,6 +1,7 @@
 import type {
   InstituteBackupSnapshot,
   InstituteBackupRow,
+  BackupOperationResult,
 } from "../types/backup";
 import { supabase } from "../lib/supabase";
 
@@ -79,10 +80,19 @@ export async function downloadBackupFile(
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const container = document.body || document.documentElement;
+      if (container && typeof container.appendChild === "function") {
+        container.appendChild(link);
+        link.click();
+        container.removeChild(link);
+      } else {
+        link.click();
+      }
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (_) {}
+      }, 100);
     }
 
     return { success: true };
@@ -100,12 +110,7 @@ export async function downloadBackupFile(
  */
 export async function restoreBackup(
   backupJson: any
-): Promise<{
-  success: boolean;
-  error?: string;
-  restoredCounts?: Record<string, number>;
-  snapshotId?: string;
-}> {
+): Promise<BackupOperationResult> {
   try {
     if (!backupJson) {
       return { success: false, error: "Backup data is required." };
@@ -172,6 +177,7 @@ export async function restoreBackup(
 
     return {
       success: true,
+      message: data?.message || "Institute backup restored successfully",
       restoredCounts: data?.restored_counts,
       snapshotId: data?.pre_restore_snapshot_id,
     };
@@ -210,6 +216,35 @@ export async function listBackups(): Promise<{
     return { data: (data || []) as InstituteBackupRow[] };
   } catch (err: any) {
     return { data: [], error: err?.message || "Failed to list backups." };
+  }
+}
+
+/**
+ * Fetches full snapshot JSON for a specific backup ID (for download or inspection).
+ */
+export async function getBackupSnapshot(
+  backupId: string
+): Promise<{ data?: InstituteBackupSnapshot; error?: string }> {
+  try {
+    if (!backupId || typeof backupId !== "string" || backupId.trim() === "") {
+      return { error: "Backup ID is required." };
+    }
+    const client = await getClient();
+    if (!client) {
+      return { error: "Supabase client is not configured." };
+    }
+    const { data, error } = await client
+      .from("institute_backups")
+      .select("snapshot_data")
+      .eq("id", backupId.trim())
+      .single();
+
+    if (error) {
+      return { error: error.message };
+    }
+    return { data: data?.snapshot_data as InstituteBackupSnapshot };
+  } catch (err: any) {
+    return { error: err?.message || "Failed to fetch backup snapshot." };
   }
 }
 
@@ -257,10 +292,7 @@ export async function undoAuditAction(
  * Purges mock/demo data for pristine production clean handover.
  * Automatically takes a safety pre_purge_snapshot before clearing records.
  */
-export async function purgeDemoData(): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+export async function purgeDemoData(): Promise<BackupOperationResult> {
   try {
     const client = await getClient();
     if (!client) {
@@ -280,7 +312,12 @@ export async function purgeDemoData(): Promise<{
       };
     }
 
-    return { success: true };
+    return {
+      success: true,
+      message: data?.message || "Demo data successfully purged",
+      snapshotId: data?.snapshot_id,
+      purgedCounts: data?.purged_counts,
+    };
   } catch (err: any) {
     return {
       success: false,
@@ -294,6 +331,7 @@ export const backupService = {
   downloadBackupFile,
   restoreBackup,
   listBackups,
+  getBackupSnapshot,
   undoAuditAction,
   purgeDemoData,
   setSupabaseClient,
