@@ -1,9 +1,9 @@
-# Design Specification: Universal ERP Lifecycle, Multi-Status Categorization, Safe Cascading Purge & Clean Handover
+# Design Specification: Universal ERP Lifecycle, Crisis Recovery, Backup/Restore & Actionable Undo
 
 **Date:** 2026-11-22  
 **Target Institute:** Pradeep Classes Management Platform  
 **Authors:** Antigravity Team & Pradeep Classes Lead  
-**Status:** APPROVED FOR PLANNING (Builder Check Integrated)
+**Status:** DRAFT (Crisis Recovery & Undo Extensions Added)
 
 ---
 
@@ -14,6 +14,7 @@ Currently in Pradeep Classes Management Platform:
 2. **Limited Student Statuses:** Students only support "Active", "On hold", and "Archived". There is no dedicated categorization for **Passed Out / Alumni**, **Rusticated / Suspended**, or **Dropped Out / Withdrawn**, which are standard in educational ERP systems.
 3. **Missing Administrative Lifecycle Actions:** Several modules (Batches, Payroll entries, Students) lack direct permanent deletion or granular status management, requiring manual database scripts.
 4. **Demo Data in Live Environment:** Seeded sample records (Dr. Rajesh Sharma, Aarav Sharma, demo batches "JEE Advanced 2026", demo payroll, sample points/badges) must be cleanly removed so the institute administrator can onboard real students, faculty, and fee structures for an official handover.
+5. **Crisis Recovery & Accidental Changes:** In an operational coaching institute, accidental edits, deletions, or data loss events occur. Administrators need **1-click Backup & Restore**, automated daily snapshotting, and an **Actionable Undo** system to revert accidental changes without technical support.
 
 ---
 
@@ -27,6 +28,13 @@ Currently in Pradeep Classes Management Platform:
   - **Delete (Hard Cascade):** Allows administrators to permanently purge any record, even if child records exist (payroll, attendance, submissions), with an explicit safety confirmation dialog explaining what will be purged.
 - **Zero Developer Dependency:** Every module in the dashboard (Students, Teachers, Batches, Timetables, Homework, Materials, Payroll, Expenses) must have direct Edit, Deactivate/Status, and Delete capabilities.
 - **Pristine Demo Data Purge:** An authorized Owner RPC to wipe all demo/test records cleanly, leaving institute settings, WhatsApp settings, and administrative accounts intact.
+- **Crisis Recovery & Instant Backup/Restore:**
+  - 1-click instant JSON database snapshot download for offline safekeeping.
+  - Automated daily backup snapshots stored in PostgreSQL (`institute_backups`).
+  - Safe 1-click "Restore from Snapshot / Uploaded Backup" with pre-restore rollback protection.
+- **Actionable Undo / Reversion:**
+  - Comprehensive audit trail recording `previous_state` and `new_state` JSON.
+  - 1-click "Undo Action" for accidental edits, status changes, and soft deletions.
 
 ### Non-Goals
 - **Parent Portal:** Parent accounts remain out of scope.
@@ -36,6 +44,7 @@ Currently in Pradeep Classes Management Platform:
 ### Anti-Goals
 - **Accidental Mass Deletion:** Hard cascade delete must never trigger silently or on a single unconfirmed click.
 - **Silent Orphaned Records:** Deleting a teacher or student must never leave dangling `auth.users` login accounts or orphaned foreign keys.
+- **Destructive Restore Without Safeguards:** A restore operation must never overwrite the database without first capturing an automatic pre-restore backup.
 
 ---
 
@@ -86,18 +95,48 @@ ALTER TABLE teachers
   ADD COLUMN IF NOT EXISTS relieving_date date;
 ```
 
-### 4.3 Cascade Deletion RPCs
+### 4.3 Backup & Crisis Recovery Schema
+```sql
+CREATE TABLE IF NOT EXISTS institute_backups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  institute_id uuid NOT NULL DEFAULT '11111111-2222-3333-4444-555555555555'::uuid,
+  backup_type text NOT NULL CHECK (backup_type IN ('automated_daily', 'manual_export', 'pre_restore_snapshot', 'pre_purge_snapshot')),
+  created_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  record_counts jsonb NOT NULL,
+  snapshot_data jsonb NOT NULL,
+  checksum text NOT NULL,
+  notes text
+);
+
+ALTER TABLE institute_backups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "institute_backups_owner_admin" ON institute_backups
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'super_admin')));
+```
+
+### 4.4 Actionable Audit Trail & Undo Table Extensions
+```sql
+ALTER TABLE audit_logs 
+  ADD COLUMN IF NOT EXISTS previous_state jsonb,
+  ADD COLUMN IF NOT EXISTS new_state jsonb,
+  ADD COLUMN IF NOT EXISTS is_reverted boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS reverted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS reverted_by uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+```
+
+### 4.5 Cascade Deletion & Purge RPCs
 
 #### `admin_delete_student(p_student_id UUID, p_force_cascade BOOLEAN)`
 - Checks calling user role (must be `owner`, `admin`, or `super_admin`).
 - If `p_force_cascade = false`:
   - Counts linked fee records, attendance records, exam marks, and doubt submissions.
-  - If count > 0, returns `{ success: false, error: "Student has linked records. Use force cascade to delete permanently, or archive instead.", linked_counts: {...} }`.
+  - If count > 0, returns warning with counts.
 - If `p_force_cascade = true`:
   - Deletes child rows: `attendance_records`, `exam_marks`, `homework_submissions`, `student_doubts`, `student_points_ledger`, `student_badges`, `student_streaks`, `fee_payments`, `fee_records`, `student_documents`, `student_certificates`.
   - Cleans up linked student user from `profiles` and `auth.users` (safely ignoring admin/owner accounts).
   - Deletes `students` row.
-  - Logs action in `audit_logs`.
+  - Logs action in `audit_logs` with `previous_state`.
 
 #### `admin_delete_teacher(p_teacher_id UUID, p_force_cascade BOOLEAN)`
 - Checks calling user role.
@@ -107,9 +146,9 @@ ALTER TABLE teachers
 - If `p_force_cascade = true`:
   - Deletes `teacher_payrolls`, `teacher_salary_configs`, `teacher_batches`.
   - Nullifies or cleans up teacher reference in `timetables` and `class_diaries`.
-  - Cleans up linked teacher user from `profiles` and `auth.users` (safely ignoring admin/owner accounts).
+  - Cleans up linked teacher user from `profiles` and `auth.users`.
   - Deletes `teachers` row.
-  - Logs action in `audit_logs`.
+  - Logs action in `audit_logs` with `previous_state`.
 
 #### `admin_delete_batch(p_batch_id UUID, p_force_cascade BOOLEAN)`
 - If `p_force_cascade = false` and students are enrolled, returns warning.
@@ -123,12 +162,41 @@ ALTER TABLE teachers
 
 #### `admin_purge_demo_data()`
 - Restricted strictly to `owner` or `super_admin`.
+- Automatically captures a `pre_purge_snapshot` into `institute_backups` before proceeding.
 - Wipes all operational demo data:
   - All students, teachers, batches, attendance sessions/records, timetables, diaries, homework, materials, demo expenses/incomes, and payroll sheets.
 - Preserves:
   - Institute profile and institute settings.
   - WhatsApp configuration and templates.
   - Authorized Owner and Admin user accounts in `profiles` and `auth.users`.
+
+### 4.6 Backup, Restore & Undo RPCs
+
+#### `admin_export_institute_backup()`
+- Exports complete data for all entities into a structured, validated JSON object:
+  ```json
+  {
+    "version": "1.0",
+    "institute_id": "11111111-2222-3333-4444-555555555555",
+    "timestamp": "2026-11-22T12:00:00Z",
+    "counts": { "students": 25, "teachers": 6, "batches": 4, ... },
+    "tables": { "students": [...], "teachers": [...], "batches": [...], ... }
+  }
+  ```
+- Stores automated record in `institute_backups` and returns the JSON payload for direct client download.
+
+#### `admin_restore_institute_backup(p_backup_json jsonb)`
+- Restricted to `owner` and `super_admin`.
+- Automatically executes `admin_export_institute_backup()` first as a `pre_restore_snapshot`!
+- Validates JSON format and version.
+- Re-populates tables within an atomic transaction. If any error occurs, transaction rolls back cleanly.
+
+#### `admin_undo_audit_action(p_audit_id UUID)`
+- Inspects the audit log row.
+- If `previous_state` exists and `is_reverted = false`:
+  - Restores the entity record in its respective table back to `previous_state`.
+  - Marks `is_reverted = true, reverted_at = now(), reverted_by = auth.uid()`.
+  - Logs a reversion audit event.
 
 ---
 
@@ -152,11 +220,9 @@ ALTER TABLE teachers
    - **Edit Faculty:** Updates profile, subject, salary configuration.
    - **Status Dropdown / Toggle:** Switch between Active, On Leave, and Relieved.
    - **Delete Teacher (Trash Button):**
-     - Resolves the current error banner:
-       - Detects if payroll records exist.
-       - Modal displays:
-         - Option 1: *"Mark as Relieved / Resigned"* (Recommended for real staff; keeps financial trail).
-         - Option 2: *"Permanently Delete Faculty & Purge Linked Records"* (For demo/mistaken records; executes `admin_delete_teacher(id, force_cascade=true)`).
+     - Resolves the screenshot error banner:
+       - Option 1: *"Mark as Relieved / Resigned"* (Recommended for real staff; keeps financial trail).
+       - Option 2: *"Permanently Delete Faculty & Purge Linked Records"* (For demo/mistaken records; executes `admin_delete_teacher(id, force_cascade=true)`).
 
 ### 5.3 Batches Page (`src/pages/Batches.tsx`)
 - Add **Edit Batch** button.
@@ -165,21 +231,33 @@ ALTER TABLE teachers
 ### 5.4 Teacher Payroll Page (`src/pages/TeacherPayroll.tsx`)
 - Add trash/delete action on each payroll sheet line item allowing authorized Owner/Admin to cancel/delete a payroll row.
 
-### 5.5 Clean Handover Tool in Settings (`src/pages/Settings.tsx`)
-- Dedicated **"Institute Data & Handover"** card under Settings (visible to Owner/Super Admin):
-  - Warning banner: *"Prepare Platform for Handover: Purge all demo/sample data before onboarding real institute records."*
-  - Button: **"Purge All Demo Data & Reset to Clean Slate"**.
-  - High-friction confirmation modal requiring user to type `"PURGE DEMO DATA"`.
-  - On confirm, executes `admin_purge_demo_data()` and resets institute directories to clean empty states.
+### 5.5 Backup, Disaster Recovery & Clean Handover in Settings (`src/pages/Settings.tsx`)
+A new dedicated tab / section: **"Backup, Crisis Recovery & Handover"**:
+1. **Backup & Disaster Recovery Card:**
+   - **Instant Backup:** Button to **"Download Full Institute Backup (.json)"**.
+   - **Snapshot History Table:** Displays historical snapshots (Automated Daily, Pre-Restore, Pre-Purge) with timestamp, size, record counts, and 1-click download or restore.
+   - **Restore from Backup:** Button to upload a backup `.json` file with safety preview and confirmation modal.
+2. **Activity Trail & Instant Undo:**
+   - View recent modifications (status changes, profile edits, deletions).
+   - 1-click **"Undo Change"** button next to recent actions.
+3. **Pristine Handover Clean Slate:**
+   - Warning banner: *"Prepare Platform for Handover: Purge all demo/sample data before onboarding real institute records."*
+   - Button: **"Purge All Demo Data & Reset to Clean Slate"**.
+   - High-friction confirmation modal requiring user to type `"PURGE DEMO DATA"`.
+   - On confirm, automatically creates a `pre_purge_snapshot` in `institute_backups`, runs `admin_purge_demo_data()`, and resets institute directories to clean empty states.
 
 ---
 
 ## 6. Implementation Stages & Verification Strategy
 
-1. **Stage 1 (Database & RPCs):** Migration `0018_erp_lifecycle_and_clean_handover.sql` with unit tests for status transitions, cascade deletions, and demo purge.
-2. **Stage 2 (Services):** Update `studentsService.ts`, `teachersService.ts`, `batchesService.ts`, and `financeService.ts`.
-3. **Stage 3 (Teachers Page):** Solve the deletion blocker by implementing the dual Relieve vs. Force-Delete modal.
-4. **Stage 4 (Students Page):** Implement the 6-status tabs, status change modal (Alumni, Rusticated, Dropped Out), and cascade delete modal.
+1. **Stage 1 (Database Migration):** `0018_erp_lifecycle_and_clean_handover.sql` with tables, status check constraints, cascade delete RPCs, `institute_backups` table, and `admin_undo_audit_action`.
+2. **Stage 2 (Services):** Create `backupService.ts`, update `studentsService.ts`, `teachersService.ts`, `batchesService.ts`, and `financeService.ts`.
+3. **Stage 3 (Teachers Page):** Dual Relieve vs. Force-Delete modal resolving the screenshot blocker.
+4. **Stage 4 (Students Page):** 6-status tabs, status change modal (Alumni, Rusticated, Dropped Out), and cascade delete modal.
 5. **Stage 5 (Batches & Payroll):** Add Delete Batch and Delete Payroll Sheet actions.
-6. **Stage 6 (Clean Slate Handover Tool & Execution):** Add Settings purge modal and execute clean state.
-7. **Stage 7 (Full Verification & Build):** Run all test suites and compile production build.
+6. **Stage 6 (Backup, Restore, Undo & Handover Hub in Settings):**
+   - Instant backup download & restore file uploader.
+   - Snapshot history table.
+   - Activity undo action.
+   - Pristine demo data purge tool.
+7. **Stage 7 (Full Verification & Build):** Run all test suites, compile production build, and commit.
