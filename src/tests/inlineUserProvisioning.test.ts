@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AuthContext, type AuthContextType } from "../context/AuthContext";
 import { CredentialsModal } from "../components/users/CredentialsModal";
 import { AdmissionModal } from "../components/students/AdmissionModal";
+import { Students } from "../pages/Students";
 import { Teachers } from "../pages/Teachers";
 import { userService } from "../services/userService";
 import type { UserRole } from "../types/auth";
@@ -69,7 +70,7 @@ export async function runInlineUserProvisioningTests() {
         isOpen: true,
         onClose: () => {},
         credentials: studentCreds,
-        whatsAppButtonLabel: "Send Welcome WhatsApp",
+        whatsAppButtonLabel: "Send Welcome WhatsApp to Student / Parent",
         title: "Student Portal Login Provisioned",
         subtitle: "STUDENT CREDENTIAL DISPATCH",
       })
@@ -81,7 +82,7 @@ export async function runInlineUserProvisioningTests() {
     assertTrue(html.includes("TempPassword!123"), "Temporary password should render");
     assertTrue(html.includes("student"), "Student role badge should render");
     assertTrue(html.includes("Copy Credentials to Clipboard"), "Copy credentials button should render");
-    assertTrue(html.includes("Send Welcome WhatsApp"), "Custom WhatsApp button label should render");
+    assertTrue(html.includes("Send Welcome WhatsApp to Student / Parent"), "Custom WhatsApp button label should render");
     assertTrue(html.includes("wa.me/919876543210"), "WhatsApp URL with country code should be formed");
     assertTrue(html.includes(encodeURIComponent("pc-2026-101@pradeepclasses.in")), "Encoded username in wa.me text");
 
@@ -285,6 +286,24 @@ export async function runInlineUserProvisioningTests() {
     } finally {
       userService.createInstituteUser = originalCreate;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // Test 7: Students page renders and integrates with admission onboarding
+  // --------------------------------------------------------------------------
+  {
+    const adminContext = createMockAuthContext("admin");
+
+    const html = renderToStaticMarkup(
+      React.createElement(
+        AuthContext.Provider,
+        { value: adminContext },
+        React.createElement(MemoryRouter, null, React.createElement(Students))
+      )
+    );
+
+    assertTrue(html.includes("New Admission"), "Students page should render New Admission action");
+    console.log("✓ Students page renders and integrates with admission onboarding flow");
   }
 
   console.log("=== All Inline User Provisioning Tests Passed Successfully ===");

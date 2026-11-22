@@ -535,7 +535,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
         onClose();
       }}
       credentials={createdCredentials}
-      whatsAppButtonLabel="Send Welcome WhatsApp"
+      whatsAppButtonLabel="Send Welcome WhatsApp to Student / Parent"
       title="Student Portal Login Provisioned"
       subtitle="STUDENT CREDENTIAL DISPATCH"
     />

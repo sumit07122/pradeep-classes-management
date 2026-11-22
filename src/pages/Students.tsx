@@ -87,7 +87,7 @@ export const Students: React.FC = () => {
 
   const handleStudentAdded = (newStudent: Student) => {
     setNotice({
-      message: `Student ${newStudent.full_name} enrolled successfully with Admission ID ${newStudent.admission_no}.`,
+      message: `Student ${newStudent.full_name} enrolled successfully with Admission ID ${newStudent.admission_no}. Portal login credentials created and ready for dispatch.`,
       type: "success",
     });
     setPage(1);
