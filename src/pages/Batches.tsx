@@ -8,6 +8,7 @@ import {
   Edit2,
   Archive,
   Search,
+  Trash2,
 } from "lucide-react";
 import { batchesService } from "../services/batchesService";
 import {
@@ -18,6 +19,7 @@ import {
   AlertNotice,
 } from "../components/common";
 import { BatchModal } from "../components/batches/BatchModal";
+import { BatchDeleteModal } from "../components/batches/BatchDeleteModal";
 import { TeacherAssignModal } from "../components/batches/TeacherAssignModal";
 import { BatchRosterDrawer } from "../components/batches/BatchRosterDrawer";
 import type { Batch, BatchStatus } from "../types";
@@ -34,6 +36,7 @@ export const Batches: React.FC = () => {
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [deletingBatch, setDeletingBatch] = useState<Batch | null>(null);
   const [assigningFacultyBatch, setAssigningFacultyBatch] = useState<Batch | null>(null);
   const [rosterBatch, setRosterBatch] = useState<Batch | null>(null);
 
@@ -227,6 +230,13 @@ export const Batches: React.FC = () => {
                             <Archive size={14} />
                           </button>
                         )}
+                        <button
+                          onClick={() => setDeletingBatch(b)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors"
+                          title="Delete batch"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
 
@@ -357,6 +367,17 @@ export const Batches: React.FC = () => {
         isOpen={Boolean(rosterBatch)}
         onClose={() => setRosterBatch(null)}
         batch={rosterBatch}
+      />
+
+      {/* Delete Batch Modal */}
+      <BatchDeleteModal
+        isOpen={Boolean(deletingBatch)}
+        onClose={() => setDeletingBatch(null)}
+        batch={deletingBatch}
+        onSuccess={(msg) => {
+          setNotice({ message: msg, type: "success" });
+          loadBatches();
+        }}
       />
     </div>
   );

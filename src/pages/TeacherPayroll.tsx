@@ -4,13 +4,14 @@ import {
   Settings, 
   RefreshCw, 
   FileText,
-  Sparkles
+  Sparkles,
+  Trash2
 } from "lucide-react";
-import { Button } from "../components/common";
+import { Button, Modal } from "../components/common";
 import { SalaryConfigModal } from "../components/finance/SalaryConfigModal";
 import { DisbursePayrollModal } from "../components/finance/DisbursePayrollModal";
 import { SalarySlipModal } from "../components/finance/SalarySlipModal";
-import { getTeacherSalaryConfigs, getTeacherPayrolls, generateMonthlyPayroll } from "../services/financeService";
+import { getTeacherSalaryConfigs, getTeacherPayrolls, generateMonthlyPayroll, deleteTeacherPayroll } from "../services/financeService";
 import type { TeacherSalaryConfig, TeacherPayroll as TeacherPayrollRecord } from "../types/finance";
 
 export const TeacherPayroll: React.FC = () => {
@@ -27,6 +28,8 @@ export const TeacherPayroll: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<TeacherSalaryConfig | null>(null);
   const [disbursingPayroll, setDisbursingPayroll] = useState<TeacherPayrollRecord | null>(null);
   const [slipPayroll, setSlipPayroll] = useState<TeacherPayrollRecord | null>(null);
+  const [deletingPayroll, setDeletingPayroll] = useState<TeacherPayrollRecord | null>(null);
+  const [isDeletingPayroll, setIsDeletingPayroll] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -286,6 +289,14 @@ export const TeacherPayroll: React.FC = () => {
                           <FileText size={12} className="mr-1" />
                           Slip
                         </Button>
+
+                        <button
+                          onClick={() => setDeletingPayroll(p)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                          title="Delete payroll sheet"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -388,6 +399,59 @@ export const TeacherPayroll: React.FC = () => {
         payroll={slipPayroll}
         onClose={() => setSlipPayroll(null)}
       />
+
+      {/* Delete Payroll Sheet Modal */}
+      {deletingPayroll && (
+        <Modal
+          isOpen={Boolean(deletingPayroll)}
+          onClose={() => setDeletingPayroll(null)}
+          title="Delete Faculty Payroll Sheet"
+        >
+          <div className="space-y-4 text-xs">
+            <p className="text-slate-600">
+              Are you sure you want to permanently delete the payroll sheet for{" "}
+              <strong>{deletingPayroll.teacher_name}</strong> for month{" "}
+              <strong>{deletingPayroll.payroll_month}</strong> (₹{Number(deletingPayroll.net_amount).toLocaleString("en-IN")})?
+            </p>
+            {deletingPayroll.status === "paid" && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
+                <strong>Notice:</strong> This record was marked as disbursed. Deleting it will also remove the corresponding expense ledger entry and reverse the liability.
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeletingPayroll(null)}
+                disabled={isDeletingPayroll}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-rose-600 hover:bg-rose-700 text-white"
+                isLoading={isDeletingPayroll}
+                onClick={async () => {
+                  try {
+                    setIsDeletingPayroll(true);
+                    await deleteTeacherPayroll(deletingPayroll.id);
+                    setSuccessMessage(`Payroll record for ${deletingPayroll.teacher_name} deleted.`);
+                    setDeletingPayroll(null);
+                    await fetchData();
+                  } catch (err: any) {
+                    setError(err.message || "Failed to delete payroll sheet");
+                  } finally {
+                    setIsDeletingPayroll(false);
+                  }
+                }}
+              >
+                Delete Record
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

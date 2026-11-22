@@ -15,7 +15,9 @@
     "test:backup": "npx tsx src/tests/backupService.test.ts",
     "test:lifecycle": "npx tsx src/tests/erpLifecycleServices.test.ts",
     "test:teachers-ui": "npx tsx src/tests/teacherLifecycleUi.test.ts",
-    "test:students-ui": "npx tsx src/tests/studentLifecycleUi.test.ts"
+    "test:students-ui": "npx tsx src/tests/studentLifecycleUi.test.ts",
+    "test:batches-payroll": "npx tsx src/tests/batchesAndPayrollLifecycle.test.ts",
+    "test:backup-ui": "npx tsx src/tests/backupAndHandoverUi.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
