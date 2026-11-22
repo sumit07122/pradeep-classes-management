@@ -272,11 +272,10 @@ export const Expenses: React.FC = () => {
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab("expenses")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${
-            activeTab === "expenses"
-              ? "bg-[#102f50] text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${activeTab === "expenses"
+            ? "bg-[#102f50] text-white shadow-sm"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
         >
           <ArrowUpRight size={14} className={activeTab === "expenses" ? "text-amber-300" : "text-rose-600"} />
           Operational Expenses ({expenses.length})
@@ -284,11 +283,10 @@ export const Expenses: React.FC = () => {
 
         <button
           onClick={() => setActiveTab("incomes")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${
-            activeTab === "incomes"
-              ? "bg-[#102f50] text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition ${activeTab === "incomes"
+            ? "bg-[#102f50] text-white shadow-sm"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
         >
           <ArrowDownLeft size={14} className={activeTab === "incomes" ? "text-emerald-300" : "text-emerald-600"} />
           Direct Incomes & Revenue ({incomes.length})
@@ -417,11 +415,10 @@ export const Expenses: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            exp.status === "approved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-rose-100 text-rose-800"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${exp.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-rose-100 text-rose-800"
+                            }`}
                         >
                           {exp.status}
                         </span>
@@ -604,11 +601,10 @@ export const Expenses: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            inc.status === "completed"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-rose-100 text-rose-800"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${inc.status === "completed"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-rose-100 text-rose-800"
+                            }`}
                         >
                           {inc.status}
                         </span>

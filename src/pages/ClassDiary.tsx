@@ -336,22 +336,20 @@ export const ClassDiary: React.FC = () => {
       <div className="flex gap-4 border-b border-slate-200">
         <button
           onClick={() => setActiveTab("diary")}
-          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${
-            activeTab === "diary"
-              ? "border-b-2 border-[#16466f] text-[#16466f]"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
+          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${activeTab === "diary"
+            ? "border-b-2 border-[#16466f] text-[#16466f]"
+            : "text-slate-500 hover:text-slate-800"
+            }`}
         >
           <FileText size={15} />
           Conducted Lectures & Diary Log ({sessions.length})
         </button>
         <button
           onClick={() => setActiveTab("syllabus")}
-          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${
-            activeTab === "syllabus"
-              ? "border-b-2 border-[#16466f] text-[#16466f]"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
+          className={`flex items-center gap-2 pb-3 font-bold text-xs uppercase tracking-wider transition ${activeTab === "syllabus"
+            ? "border-b-2 border-[#16466f] text-[#16466f]"
+            : "text-slate-500 hover:text-slate-800"
+            }`}
         >
           <BookmarkCheck size={15} />
           Curriculum & Syllabus Progress Tracker ({syllabus.length} Chapters)
@@ -430,62 +428,62 @@ export const ClassDiary: React.FC = () => {
                           )}
                         </div>
 
-                      <div className="text-xs font-bold text-slate-700 flex items-center justify-end gap-1">
-                        <Calendar size={12} className="text-slate-400" />
-                        {new Date(sess.session_date).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </div>
-                      <div className="text-[11px] text-slate-500 flex items-center justify-end gap-1 mt-0.5">
-                        <Clock size={11} className="text-slate-400" />
-                        {sess.start_time} - {sess.end_time} ({sess.actual_duration_minutes}m)
+                        <div className="text-xs font-bold text-slate-700 flex items-center justify-end gap-1">
+                          <Calendar size={12} className="text-slate-400" />
+                          {new Date(sess.session_date).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center justify-end gap-1 mt-0.5">
+                          <Clock size={11} className="text-slate-400" />
+                          {sess.start_time} - {sess.end_time} ({sess.actual_duration_minutes}m)
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Topics Covered */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-700">
-                    <span className="font-bold text-[#16466f] block mb-1">Topics Taught:</span>
-                    <p className="whitespace-pre-line leading-relaxed">
-                      {sess.diary?.topics_covered || "Topics not specified"}
-                    </p>
-                  </div>
-
-                  {/* Homework / Remarks */}
-                  {(sess.diary?.homework_notes || sess.diary?.teaching_remarks) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                      {sess.diary?.homework_notes && (
-                        <div className="bg-amber-50/70 border border-amber-200/60 p-2.5 rounded-lg text-amber-900">
-                          <span className="font-bold block mb-0.5">📝 Homework Assigned:</span>
-                          <p>{sess.diary.homework_notes}</p>
-                        </div>
-                      )}
-                      {sess.diary?.teaching_remarks && (
-                        <div className="bg-indigo-50/70 border border-indigo-200/60 p-2.5 rounded-lg text-indigo-900">
-                          <span className="font-bold block mb-0.5">💡 Teaching Observation:</span>
-                          <p>{sess.diary.teaching_remarks}</p>
-                        </div>
-                      )}
+                    {/* Topics Covered */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-700">
+                      <span className="font-bold text-[#16466f] block mb-1">Topics Taught:</span>
+                      <p className="whitespace-pre-line leading-relaxed">
+                        {sess.diary?.topics_covered || "Topics not specified"}
+                      </p>
                     </div>
-                  )}
 
-                  {/* Footer */}
-                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <User size={12} className="text-slate-400" />
-                      Faculty: <b className="text-slate-700">{sess.teacher_name}</b>
-                    </span>
-                    {sess.diary?.next_planned_topic && (
-                      <span className="text-teal-700 font-semibold truncate max-w-[200px]">
-                        Next: {sess.diary.next_planned_topic}
-                      </span>
+                    {/* Homework / Remarks */}
+                    {(sess.diary?.homework_notes || sess.diary?.teaching_remarks) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        {sess.diary?.homework_notes && (
+                          <div className="bg-amber-50/70 border border-amber-200/60 p-2.5 rounded-lg text-amber-900">
+                            <span className="font-bold block mb-0.5">📝 Homework Assigned:</span>
+                            <p>{sess.diary.homework_notes}</p>
+                          </div>
+                        )}
+                        {sess.diary?.teaching_remarks && (
+                          <div className="bg-indigo-50/70 border border-indigo-200/60 p-2.5 rounded-lg text-indigo-900">
+                            <span className="font-bold block mb-0.5">💡 Teaching Observation:</span>
+                            <p>{sess.diary.teaching_remarks}</p>
+                          </div>
+                        )}
+                      </div>
                     )}
+
+                    {/* Footer */}
+                    <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <User size={12} className="text-slate-400" />
+                        Faculty: <b className="text-slate-700">{sess.teacher_name}</b>
+                      </span>
+                      {sess.diary?.next_planned_topic && (
+                        <span className="text-teal-700 font-semibold truncate max-w-[200px]">
+                          Next: {sess.diary.next_planned_topic}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
           )}
         </div>
@@ -553,17 +551,15 @@ export const ClassDiary: React.FC = () => {
                           <div
                             key={t.id}
                             onClick={() => handleToggleTopicStatus(t.id, t.status || "not_started")}
-                            className={`p-2.5 rounded-lg border text-xs flex items-start gap-2.5 transition ${
-                              isStaff && selectedBatchId !== "all"
-                                ? "cursor-pointer hover:shadow-sm"
-                                : ""
-                            } ${
-                              t.status === "completed"
+                            className={`p-2.5 rounded-lg border text-xs flex items-start gap-2.5 transition ${isStaff && selectedBatchId !== "all"
+                              ? "cursor-pointer hover:shadow-sm"
+                              : ""
+                              } ${t.status === "completed"
                                 ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
                                 : t.status === "in_progress"
-                                ? "bg-blue-50/80 border-blue-200 text-blue-900"
-                                : "bg-white border-slate-200 text-slate-700"
-                            }`}
+                                  ? "bg-blue-50/80 border-blue-200 text-blue-900"
+                                  : "bg-white border-slate-200 text-slate-700"
+                              }`}
                           >
                             <span className="mt-0.5">
                               {t.status === "completed" ? (

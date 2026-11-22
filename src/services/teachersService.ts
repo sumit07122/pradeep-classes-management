@@ -45,10 +45,10 @@ export const teachersService = {
 
         const salary_config: TeacherSalaryConfigData | undefined = salaryRow
           ? {
-              calculation_type: salaryRow.calculation_type,
-              base_amount: Number(salaryRow.base_amount || 0),
-              per_lecture_rate: Number(salaryRow.per_lecture_rate || 0),
-            }
+            calculation_type: salaryRow.calculation_type,
+            base_amount: Number(salaryRow.base_amount || 0),
+            per_lecture_rate: Number(salaryRow.per_lecture_rate || 0),
+          }
           : undefined;
 
         return {
