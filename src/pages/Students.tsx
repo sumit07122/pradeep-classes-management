@@ -318,8 +318,8 @@ export const Students: React.FC = () => {
                           s.status === "Active"
                             ? "success"
                             : s.status === "On hold"
-                            ? "warning"
-                            : "neutral"
+                              ? "warning"
+                              : "neutral"
                         }
                         size="sm"
                         showDot

@@ -214,331 +214,331 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
         title="Student Admission & Registration"
         subtitle="NEW STUDENT ENROLLMENT"
       >
-      <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 text-xs text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-xs text-red-700 rounded-lg">
+              {error}
+            </div>
+          )}
 
-        {/* Section 1: Personal Details */}
-        <div>
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
-              1
-            </span>
-            Student Personal Information
-          </h4>
+          {/* Section 1: Personal Details */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
+                1
+              </span>
+              Student Personal Information
+            </h4>
 
-          <div className="space-y-3">
-            <Input
-              label="Full Name *"
-              required
-              autoFocus
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. Rohan Sharma"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               <Input
-                label="Student Mobile Phone *"
+                label="Full Name *"
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
+                autoFocus
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g. Rohan Sharma"
               />
 
-              <Input
-                label="Student Email Address"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="rohan@example.com"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label="Date of Birth"
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-              />
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Gender
-                </label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
-                  label="Residential Address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Street / Colony / Landmark"
+                  label="Student Mobile Phone *"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
                 />
-              </div>
-              <Input
-                label="City"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Mathura"
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* Section 2: Academic & Batch */}
-        <div className="pt-3 border-t border-slate-100">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
-              2
-            </span>
-            Academic Level & Learning Batch
-          </h4>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Enrolled Class *"
-              options={CLASSES}
-              value={className}
-              onChange={(e) => setClassName(e.target.value)}
-            />
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Assigned Batch (Live Capacity) *
-              </label>
-              {loadingBatches ? (
-                <div className="h-10 px-3 flex items-center text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
-                  Loading live batches...
-                </div>
-              ) : batches.length === 0 ? (
-                <div className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                  No active batches found. Please create a batch first.
-                </div>
-              ) : (
-                <select
-                  value={selectedBatchId}
-                  onChange={(e) => setSelectedBatchId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
-                >
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id} disabled={!b.is_available}>
-                      {b.name} — ({b.enrolled_count}/{b.max_capacity} Seats
-                      {!b.is_available ? " • FULL" : ""})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Guardian Details */}
-        <div className="pt-3 border-t border-slate-100">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
-              3
-            </span>
-            Parent / Guardian Details
-          </h4>
-
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
                 <Input
-                  label="Parent / Guardian Name"
-                  value={parentName}
-                  onChange={(e) => setParentName(e.target.value)}
-                  placeholder="e.g. Rajesh Sharma"
+                  label="Student Email Address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="rohan@example.com"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Relationship
-                </label>
-                <select
-                  value={parentRelation}
-                  onChange={(e) => setParentRelation(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
-                >
-                  <option value="Father">Father</option>
-                  <option value="Mother">Mother</option>
-                  <option value="Guardian">Legal Guardian</option>
-                  <option value="Sibling">Elder Sibling</option>
-                </select>
-              </div>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Date of Birth"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label="Parent Mobile Phone"
-                value={parentPhone}
-                onChange={(e) => setParentPhone(e.target.value)}
-                placeholder="+91 98765 00000"
-              />
-
-              <Input
-                label="Parent Email"
-                type="email"
-                value={parentEmail}
-                onChange={(e) => setParentEmail(e.target.value)}
-                placeholder="rajesh.sharma@example.com"
-              />
-            </div>
-
-            <Input
-              label="Emergency Contact Phone"
-              value={emergencyContact}
-              onChange={(e) => setEmergencyContact(e.target.value)}
-              placeholder="Alternative phone number"
-            />
-          </div>
-        </div>
-
-        {/* Section 4: Student Portal Login Account */}
-        <div className="pt-3 border-t border-slate-100">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
-              4
-            </span>
-            Portal Access & Login Account
-          </h4>
-
-          <div className="p-3.5 bg-sky-50/60 rounded-xl border border-sky-100 space-y-3">
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
-              <input
-                id="generate-student-login-toggle"
-                type="checkbox"
-                checked={generateLogin}
-                onChange={(e) => setGenerateLogin(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#16466f] focus:ring-[#16466f]"
-              />
-              <div>
-                <span className="text-xs font-bold text-[#1c3045] flex items-center gap-1.5">
-                  <KeyRound size={14} className="text-[#16466f]" />
-                  Generate Student Portal Login Account
-                </span>
-                <span className="text-[11px] text-slate-500 block mt-0.5">
-                  Creates active portal credentials so the student can access notes, tests, and homework immediately.
-                </span>
-              </div>
-            </label>
-
-            {generateLogin && (
-              <div className="space-y-2 pt-2 border-t border-sky-100">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Temporary Password *
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Gender
                   </label>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    Min 6 characters
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as any)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Residential Address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Street / Colony / Landmark"
+                  />
+                </div>
+                <Input
+                  label="City"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Mathura"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Academic & Batch */}
+          <div className="pt-3 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
+                2
+              </span>
+              Academic Level & Learning Batch
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                label="Enrolled Class *"
+                options={CLASSES}
+                value={className}
+                onChange={(e) => setClassName(e.target.value)}
+              />
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Assigned Batch (Live Capacity) *
+                </label>
+                {loadingBatches ? (
+                  <div className="h-10 px-3 flex items-center text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg">
+                    Loading live batches...
+                  </div>
+                ) : batches.length === 0 ? (
+                  <div className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                    No active batches found. Please create a batch first.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedBatchId}
+                    onChange={(e) => setSelectedBatchId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
+                  >
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id} disabled={!b.is_available}>
+                        {b.name} — ({b.enrolled_count}/{b.max_capacity} Seats
+                        {!b.is_available ? " • FULL" : ""})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Guardian Details */}
+          <div className="pt-3 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
+                3
+              </span>
+              Parent / Guardian Details
+            </h4>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Parent / Guardian Name"
+                    value={parentName}
+                    onChange={(e) => setParentName(e.target.value)}
+                    placeholder="e.g. Rajesh Sharma"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Relationship
+                  </label>
+                  <select
+                    value={parentRelation}
+                    onChange={(e) => setParentRelation(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white outline-none focus:border-[#16466f]"
+                  >
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Legal Guardian</option>
+                    <option value="Sibling">Elder Sibling</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Parent Mobile Phone"
+                  value={parentPhone}
+                  onChange={(e) => setParentPhone(e.target.value)}
+                  placeholder="+91 98765 00000"
+                />
+
+                <Input
+                  label="Parent Email"
+                  type="email"
+                  value={parentEmail}
+                  onChange={(e) => setParentEmail(e.target.value)}
+                  placeholder="rajesh.sharma@example.com"
+                />
+              </div>
+
+              <Input
+                label="Emergency Contact Phone"
+                value={emergencyContact}
+                onChange={(e) => setEmergencyContact(e.target.value)}
+                placeholder="Alternative phone number"
+              />
+            </div>
+          </div>
+
+          {/* Section 4: Student Portal Login Account */}
+          <div className="pt-3 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
+                4
+              </span>
+              Portal Access & Login Account
+            </h4>
+
+            <div className="p-3.5 bg-sky-50/60 rounded-xl border border-sky-100 space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  id="generate-student-login-toggle"
+                  type="checkbox"
+                  checked={generateLogin}
+                  onChange={(e) => setGenerateLogin(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#16466f] focus:ring-[#16466f]"
+                />
+                <div>
+                  <span className="text-xs font-bold text-[#1c3045] flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-[#16466f]" />
+                    Generate Student Portal Login Account
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Creates active portal credentials so the student can access notes, tests, and homework immediately.
                   </span>
                 </div>
+              </label>
 
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      value={tempPassword}
-                      onChange={(e) => setTempPassword(e.target.value)}
-                      placeholder="Temporary password"
-                      className="font-mono text-xs pr-10"
-                      required={generateLogin}
-                    />
+              {generateLogin && (
+                <div className="space-y-2 pt-2 border-t border-sky-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Temporary Password *
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Min 6 characters
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
+                        placeholder="Temporary password"
+                        className="font-mono text-xs pr-10"
+                        required={generateLogin}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setTempPassword(generateSecurePassword(10))}
+                      icon={<RefreshCw size={13} />}
+                      title="Generate new random password"
+                    >
+                      Generate
+                    </Button>
+
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      title={showPassword ? "Hide password" : "Show password"}
+                      onClick={handleCopyPassword}
+                      className="h-10 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                      title="Copy temporary password"
                     >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      {copiedPassword ? (
+                        <>
+                          <Check size={14} className="text-emerald-600" />
+                          <span className="text-emerald-700">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} className="text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setTempPassword(generateSecurePassword(10))}
-                    icon={<RefreshCw size={13} />}
-                    title="Generate new random password"
-                  >
-                    Generate
-                  </Button>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyPassword}
-                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                    title="Copy temporary password"
-                  >
-                    {copiedPassword ? (
-                      <>
-                        <Check size={14} className="text-emerald-600" />
-                        <span className="text-emerald-700">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} className="text-slate-500" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
+                  <p className="text-[11px] text-slate-600 flex items-center gap-1.5 pt-1">
+                    <Sparkles size={13} className="text-amber-500 shrink-0" />
+                    <span>
+                      {email.trim()
+                        ? `Student username will be ${email.trim()}`
+                        : "If student email is omitted, username defaults to {admission_no}@pradeepclasses.in."}
+                    </span>
+                  </p>
                 </div>
-
-                <p className="text-[11px] text-slate-600 flex items-center gap-1.5 pt-1">
-                  <Sparkles size={13} className="text-amber-500 shrink-0" />
-                  <span>
-                    {email.trim()
-                      ? `Student username will be ${email.trim()}`
-                      : "If student email is omitted, username defaults to {admission_no}@pradeepclasses.in."}
-                  </span>
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" isLoading={isSubmitting}>
-            Confirm Admission & Generate ID
-          </Button>
-        </div>
-      </form>
-    </Modal>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isSubmitting}>
+              Confirm Admission & Generate ID
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-    <CredentialsModal
-      isOpen={Boolean(createdCredentials)}
-      onClose={() => {
-        setCreatedCredentials(null);
-        resetForm();
-        onClose();
-      }}
-      credentials={createdCredentials}
-      whatsAppButtonLabel="Send Welcome WhatsApp to Student / Parent"
-      title="Student Portal Login Provisioned"
-      subtitle="STUDENT CREDENTIAL DISPATCH"
-    />
+      <CredentialsModal
+        isOpen={Boolean(createdCredentials)}
+        onClose={() => {
+          setCreatedCredentials(null);
+          resetForm();
+          onClose();
+        }}
+        credentials={createdCredentials}
+        whatsAppButtonLabel="Send Welcome WhatsApp to Student / Parent"
+        title="Student Portal Login Provisioned"
+        subtitle="STUDENT CREDENTIAL DISPATCH"
+      />
     </>
   );
 };
