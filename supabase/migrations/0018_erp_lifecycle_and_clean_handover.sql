@@ -39,7 +39,7 @@ ALTER TABLE public.students
   ADD COLUMN IF NOT EXISTS status_changed_at timestamptz DEFAULT now(),
   ADD COLUMN IF NOT EXISTS exit_date date;
 
--- Update batch transfer RPC to use text for v_student_status
+-- Update batch transfer RPC to use text for v_student_status and hardened search_path
 CREATE OR REPLACE FUNCTION public.transfer_student_batch(
   p_student_id uuid,
   p_to_batch_id uuid,
@@ -48,7 +48,7 @@ CREATE OR REPLACE FUNCTION public.transfer_student_batch(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role app_role;
@@ -181,7 +181,7 @@ ALTER TABLE public.teachers ADD CONSTRAINT teachers_status_check
 
 CREATE TABLE IF NOT EXISTS public.institute_backups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  institute_id uuid NOT NULL REFERENCES public.institutes(id) ON DELETE CASCADE DEFAULT '11111111-2222-3333-4444-555555555555'::uuid,
+  institute_id uuid NOT NULL REFERENCES public.institutes(id) ON DELETE CASCADE,
   backup_type text NOT NULL CHECK (backup_type IN ('automated_daily', 'manual_export', 'pre_restore_snapshot', 'pre_purge_snapshot')),
   created_at timestamptz DEFAULT now(),
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -191,6 +191,9 @@ CREATE TABLE IF NOT EXISTS public.institute_backups (
   notes text
 );
 
+-- Ensure no hardcoded default institute UUID exists
+ALTER TABLE public.institute_backups ALTER COLUMN institute_id DROP DEFAULT;
+
 CREATE INDEX IF NOT EXISTS idx_institute_backups_inst_created ON public.institute_backups(institute_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_institute_backups_type ON public.institute_backups(backup_type);
 
@@ -199,7 +202,20 @@ ALTER TABLE public.institute_backups ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "institute_backups_owner_admin" ON public.institute_backups;
 CREATE POLICY "institute_backups_owner_admin" ON public.institute_backups
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'super_admin')));
+  USING (
+    public.current_user_role() = 'super_admin'
+    OR (
+      public.current_user_role() IN ('owner', 'admin')
+      AND institute_id = public.current_user_institute_id()
+    )
+  )
+  WITH CHECK (
+    public.current_user_role() = 'super_admin'
+    OR (
+      public.current_user_role() IN ('owner', 'admin')
+      AND institute_id = public.current_user_institute_id()
+    )
+  );
 
 -- ----------------------------------------------------------------------------
 -- 4. Actionable Audit Trail & Undo Table Extensions
@@ -222,9 +238,11 @@ CREATE OR REPLACE FUNCTION public._internal_export_institute_snapshot(p_institut
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
+  v_caller_role public.app_role;
+  v_caller_inst uuid;
   v_students jsonb;
   v_teachers jsonb;
   v_batches jsonb;
@@ -254,10 +272,23 @@ DECLARE
   v_docs jsonb;
   v_certs jsonb;
   v_progress jsonb;
+  v_parent_students jsonb;
+  v_student_batch_history jsonb;
   v_counts jsonb;
   v_tables jsonb;
   v_backup jsonb;
 BEGIN
+  -- Caller authorization and tenant match check
+  v_caller_role := public.current_user_role();
+  IF v_caller_role IS NULL OR v_caller_role NOT IN ('owner', 'super_admin') THEN
+    RAISE EXCEPTION 'Unauthorized: Only Owner or Super Admin can export institute snapshot';
+  END IF;
+
+  v_caller_inst := public.current_user_institute_id();
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR p_institute_id IS DISTINCT FROM v_caller_inst) THEN
+    RAISE EXCEPTION 'Unauthorized: Caller institute does not match requested institute';
+  END IF;
+
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_students FROM public.students t WHERE t.institute_id = p_institute_id;
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_teachers FROM public.teachers t WHERE t.institute_id = p_institute_id;
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_batches FROM public.batches t WHERE t.institute_id = p_institute_id;
@@ -287,6 +318,8 @@ BEGIN
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_docs FROM public.student_documents t WHERE t.institute_id = p_institute_id;
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_certs FROM public.student_certificates t WHERE t.institute_id = p_institute_id;
   SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_progress FROM public.batch_topic_progress t WHERE t.institute_id = p_institute_id;
+  SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_parent_students FROM public.parent_students t WHERE t.institute_id = p_institute_id;
+  SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) INTO v_student_batch_history FROM public.student_batch_history t WHERE t.institute_id = p_institute_id;
 
   v_counts := jsonb_build_object(
     'students', jsonb_array_length(v_students),
@@ -317,7 +350,9 @@ BEGIN
     'student_streaks', jsonb_array_length(v_streaks),
     'student_documents', jsonb_array_length(v_docs),
     'student_certificates', jsonb_array_length(v_certs),
-    'batch_topic_progress', jsonb_array_length(v_progress)
+    'batch_topic_progress', jsonb_array_length(v_progress),
+    'parent_students', jsonb_array_length(v_parent_students),
+    'student_batch_history', jsonb_array_length(v_student_batch_history)
   );
 
   v_tables := jsonb_build_object(
@@ -349,7 +384,9 @@ BEGIN
     'student_streaks', v_streaks,
     'student_documents', v_docs,
     'student_certificates', v_certs,
-    'batch_topic_progress', v_progress
+    'batch_topic_progress', v_progress,
+    'parent_students', v_parent_students,
+    'student_batch_history', v_student_batch_history
   );
 
   v_backup := jsonb_build_object(
@@ -375,7 +412,7 @@ CREATE OR REPLACE FUNCTION public.admin_delete_student(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -397,7 +434,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner, Admin, or Super Admin can delete students';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
 
   -- 2. Fetch student
   SELECT * INTO v_student FROM public.students WHERE id = p_student_id FOR UPDATE;
@@ -405,7 +442,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Student not found');
   END IF;
 
-  IF v_caller_role != 'super_admin' AND v_student.institute_id IS DISTINCT FROM v_caller_inst THEN
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR v_student.institute_id IS DISTINCT FROM v_caller_inst) THEN
     RAISE EXCEPTION 'Unauthorized: Student belongs to another institute';
   END IF;
 
@@ -499,7 +536,7 @@ CREATE OR REPLACE FUNCTION public.admin_delete_teacher(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -519,7 +556,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner, Admin, or Super Admin can delete faculty';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
 
   -- 2. Fetch teacher
   SELECT * INTO v_teacher FROM public.teachers WHERE id = p_teacher_id FOR UPDATE;
@@ -527,7 +564,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Teacher not found');
   END IF;
 
-  IF v_caller_role != 'super_admin' AND v_teacher.institute_id IS DISTINCT FROM v_caller_inst THEN
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR v_teacher.institute_id IS DISTINCT FROM v_caller_inst) THEN
     RAISE EXCEPTION 'Unauthorized: Teacher belongs to another institute';
   END IF;
 
@@ -623,7 +660,7 @@ CREATE OR REPLACE FUNCTION public.admin_delete_batch(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -641,7 +678,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner, Admin, or Super Admin can delete batches';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
 
   -- 2. Fetch batch
   SELECT * INTO v_batch FROM public.batches WHERE id = p_batch_id FOR UPDATE;
@@ -649,7 +686,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Batch not found');
   END IF;
 
-  IF v_caller_role != 'super_admin' AND v_batch.institute_id IS DISTINCT FROM v_caller_inst THEN
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR v_batch.institute_id IS DISTINCT FROM v_caller_inst) THEN
     RAISE EXCEPTION 'Unauthorized: Batch belongs to another institute';
   END IF;
 
@@ -745,7 +782,7 @@ CREATE OR REPLACE FUNCTION public.admin_delete_payroll_record(p_payroll_id UUID)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -759,7 +796,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner, Admin, or Super Admin can delete payroll records';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
 
   -- 2. Fetch payroll record
   SELECT * INTO v_payroll FROM public.teacher_payrolls WHERE id = p_payroll_id FOR UPDATE;
@@ -767,7 +804,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Payroll record not found');
   END IF;
 
-  IF v_caller_role != 'super_admin' AND v_payroll.institute_id IS DISTINCT FROM v_caller_inst THEN
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR v_payroll.institute_id IS DISTINCT FROM v_caller_inst) THEN
     RAISE EXCEPTION 'Unauthorized: Payroll record belongs to another institute';
   END IF;
 
@@ -810,7 +847,7 @@ CREATE OR REPLACE FUNCTION public.admin_export_institute_backup()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -825,7 +862,10 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner or Super Admin can export full database backups';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
+  IF v_caller_role != 'super_admin' AND v_caller_inst IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: Caller has no institute association';
+  END IF;
 
   -- 2. Generate backup JSON snapshot
   v_backup := public._internal_export_institute_snapshot(v_caller_inst);
@@ -864,7 +904,7 @@ CREATE OR REPLACE FUNCTION public.admin_restore_institute_backup(p_backup_json j
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -889,8 +929,18 @@ BEGIN
     RAISE EXCEPTION 'Invalid backup payload: must be JSON with version "1.0" and a valid "tables" object';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
-  v_target_inst := v_caller_inst;
+  v_caller_inst := public.current_user_institute_id();
+  IF v_caller_role != 'super_admin' AND v_caller_inst IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: Caller has no institute association';
+  END IF;
+
+  v_target_inst := coalesce(v_caller_inst, (p_backup_json->>'institute_id')::uuid);
+
+  -- Multi-tenant isolation verification
+  IF v_caller_role != 'super_admin' AND (p_backup_json->>'institute_id')::uuid IS DISTINCT FROM v_target_inst THEN
+    RAISE EXCEPTION 'Unauthorized: Backup institute ID % does not match caller institute ID %',
+      (p_backup_json->>'institute_id'), v_target_inst;
+  END IF;
 
   -- 3. Automatic Pre-Restore Safety Snapshot!
   v_snapshot := public._internal_export_institute_snapshot(v_target_inst);
@@ -952,31 +1002,46 @@ BEGIN
 
   v_tables := p_backup_json->'tables';
 
-  -- 5. Restore tables in dependency order
+  -- 5. Restore tables in dependency order forcing institute_id = v_target_inst
   IF jsonb_typeof(v_tables->'batches') = 'array' AND jsonb_array_length(v_tables->'batches') > 0 THEN
-    INSERT INTO public.batches SELECT * FROM jsonb_populate_recordset(null::public.batches, v_tables->'batches')
+    INSERT INTO public.batches
+    SELECT * FROM jsonb_populate_recordset(null::public.batches, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'batches') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'teachers') = 'array' AND jsonb_array_length(v_tables->'teachers') > 0 THEN
-    INSERT INTO public.teachers
+    INSERT INTO public.teachers (
+      id, profile_id, full_name, subject, phone, is_active, created_at,
+      institute_id, status, status_reason, status_changed_at, relieving_date
+    )
     SELECT
       r.id,
       CASE WHEN EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = r.profile_id) THEN r.profile_id ELSE NULL END,
-      r.full_name, r.subject, r.phone, r.is_active, r.created_at, r.institute_id,
+      r.full_name, r.subject, r.phone, r.is_active, r.created_at,
+      v_target_inst,
       coalesce(r.status, 'active'), r.status_reason, coalesce(r.status_changed_at, now()), r.relieving_date
     FROM jsonb_populate_recordset(null::public.teachers, v_tables->'teachers') r
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'students') = 'array' AND jsonb_array_length(v_tables->'students') > 0 THEN
-    INSERT INTO public.students
+    INSERT INTO public.students (
+      id, admission_no, full_name, class_name, batch_name, batch_id,
+      phone, parent_name, parent_phone, status, joined_on, created_at,
+      updated_at, profile_id, institute_id, email, date_of_birth, gender,
+      address, city, emergency_contact, parent_relation, parent_email,
+      notes, photo_url, roll_no, status_reason, status_changed_at, exit_date
+    )
     SELECT
       r.id, r.admission_no, r.full_name, r.class_name, r.batch_name, r.batch_id,
       r.phone, r.parent_name, r.parent_phone, coalesce(r.status, 'active'), r.joined_on, r.created_at,
       r.updated_at,
       CASE WHEN EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = r.profile_id) THEN r.profile_id ELSE NULL END,
-      r.institute_id, r.email, r.date_of_birth, r.gender, r.address, r.city,
+      v_target_inst,
+      r.email, r.date_of_birth, r.gender, r.address, r.city,
       r.emergency_contact, r.parent_relation, r.parent_email, r.notes, r.photo_url,
       r.roll_no, r.status_reason, coalesce(r.status_changed_at, now()), r.exit_date
     FROM jsonb_populate_recordset(null::public.students, v_tables->'students') r
@@ -984,132 +1049,263 @@ BEGIN
   END IF;
 
   IF jsonb_typeof(v_tables->'timetables') = 'array' AND jsonb_array_length(v_tables->'timetables') > 0 THEN
-    INSERT INTO public.timetables SELECT * FROM jsonb_populate_recordset(null::public.timetables, v_tables->'timetables')
+    INSERT INTO public.timetables
+    SELECT * FROM jsonb_populate_recordset(null::public.timetables, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'timetables') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'attendance_sessions') = 'array' AND jsonb_array_length(v_tables->'attendance_sessions') > 0 THEN
-    INSERT INTO public.attendance_sessions SELECT * FROM jsonb_populate_recordset(null::public.attendance_sessions, v_tables->'attendance_sessions')
+    INSERT INTO public.attendance_sessions
+    SELECT * FROM jsonb_populate_recordset(null::public.attendance_sessions, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'attendance_sessions') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'attendance_records') = 'array' AND jsonb_array_length(v_tables->'attendance_records') > 0 THEN
-    INSERT INTO public.attendance_records SELECT * FROM jsonb_populate_recordset(null::public.attendance_records, v_tables->'attendance_records')
+    INSERT INTO public.attendance_records
+    SELECT * FROM jsonb_populate_recordset(null::public.attendance_records, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'attendance_records') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'class_sessions') = 'array' AND jsonb_array_length(v_tables->'class_sessions') > 0 THEN
-    INSERT INTO public.class_sessions SELECT * FROM jsonb_populate_recordset(null::public.class_sessions, v_tables->'class_sessions')
+    INSERT INTO public.class_sessions
+    SELECT * FROM jsonb_populate_recordset(null::public.class_sessions, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'class_sessions') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'class_diaries') = 'array' AND jsonb_array_length(v_tables->'class_diaries') > 0 THEN
-    INSERT INTO public.class_diaries SELECT * FROM jsonb_populate_recordset(null::public.class_diaries, v_tables->'class_diaries')
+    INSERT INTO public.class_diaries
+    SELECT * FROM jsonb_populate_recordset(null::public.class_diaries, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'class_diaries') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'homework') = 'array' AND jsonb_array_length(v_tables->'homework') > 0 THEN
-    INSERT INTO public.homework SELECT * FROM jsonb_populate_recordset(null::public.homework, v_tables->'homework')
+    INSERT INTO public.homework
+    SELECT * FROM jsonb_populate_recordset(null::public.homework, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'homework') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'homework_submissions') = 'array' AND jsonb_array_length(v_tables->'homework_submissions') > 0 THEN
-    INSERT INTO public.homework_submissions SELECT * FROM jsonb_populate_recordset(null::public.homework_submissions, v_tables->'homework_submissions')
+    INSERT INTO public.homework_submissions
+    SELECT * FROM jsonb_populate_recordset(null::public.homework_submissions, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'homework_submissions') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'exams') = 'array' AND jsonb_array_length(v_tables->'exams') > 0 THEN
-    INSERT INTO public.exams SELECT * FROM jsonb_populate_recordset(null::public.exams, v_tables->'exams')
+    INSERT INTO public.exams
+    SELECT * FROM jsonb_populate_recordset(null::public.exams, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'exams') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'exam_marks') = 'array' AND jsonb_array_length(v_tables->'exam_marks') > 0 THEN
-    INSERT INTO public.exam_marks SELECT * FROM jsonb_populate_recordset(null::public.exam_marks, v_tables->'exam_marks')
+    INSERT INTO public.exam_marks
+    SELECT * FROM jsonb_populate_recordset(null::public.exam_marks, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'exam_marks') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'study_materials') = 'array' AND jsonb_array_length(v_tables->'study_materials') > 0 THEN
-    INSERT INTO public.study_materials SELECT * FROM jsonb_populate_recordset(null::public.study_materials, v_tables->'study_materials')
+    INSERT INTO public.study_materials
+    SELECT * FROM jsonb_populate_recordset(null::public.study_materials, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'study_materials') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'announcements') = 'array' AND jsonb_array_length(v_tables->'announcements') > 0 THEN
-    INSERT INTO public.announcements SELECT * FROM jsonb_populate_recordset(null::public.announcements, v_tables->'announcements')
+    INSERT INTO public.announcements
+    SELECT * FROM jsonb_populate_recordset(null::public.announcements, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'announcements') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'fee_structures') = 'array' AND jsonb_array_length(v_tables->'fee_structures') > 0 THEN
-    INSERT INTO public.fee_structures SELECT * FROM jsonb_populate_recordset(null::public.fee_structures, v_tables->'fee_structures')
+    INSERT INTO public.fee_structures
+    SELECT * FROM jsonb_populate_recordset(null::public.fee_structures, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'fee_structures') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'fee_records') = 'array' AND jsonb_array_length(v_tables->'fee_records') > 0 THEN
-    INSERT INTO public.fee_records SELECT * FROM jsonb_populate_recordset(null::public.fee_records, v_tables->'fee_records')
+    INSERT INTO public.fee_records
+    SELECT * FROM jsonb_populate_recordset(null::public.fee_records, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'fee_records') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'fee_payments') = 'array' AND jsonb_array_length(v_tables->'fee_payments') > 0 THEN
-    INSERT INTO public.fee_payments SELECT * FROM jsonb_populate_recordset(null::public.fee_payments, v_tables->'fee_payments')
+    INSERT INTO public.fee_payments
+    SELECT * FROM jsonb_populate_recordset(null::public.fee_payments, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'fee_payments') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'teacher_salary_configs') = 'array' AND jsonb_array_length(v_tables->'teacher_salary_configs') > 0 THEN
-    INSERT INTO public.teacher_salary_configs SELECT * FROM jsonb_populate_recordset(null::public.teacher_salary_configs, v_tables->'teacher_salary_configs')
+    INSERT INTO public.teacher_salary_configs
+    SELECT * FROM jsonb_populate_recordset(null::public.teacher_salary_configs, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'teacher_salary_configs') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'teacher_batches') = 'array' AND jsonb_array_length(v_tables->'teacher_batches') > 0 THEN
-    INSERT INTO public.teacher_batches SELECT * FROM jsonb_populate_recordset(null::public.teacher_batches, v_tables->'teacher_batches')
+    INSERT INTO public.teacher_batches
+    SELECT * FROM jsonb_populate_recordset(null::public.teacher_batches, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'teacher_batches') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'teacher_payrolls') = 'array' AND jsonb_array_length(v_tables->'teacher_payrolls') > 0 THEN
-    INSERT INTO public.teacher_payrolls SELECT * FROM jsonb_populate_recordset(null::public.teacher_payrolls, v_tables->'teacher_payrolls')
+    INSERT INTO public.teacher_payrolls
+    SELECT * FROM jsonb_populate_recordset(null::public.teacher_payrolls, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'teacher_payrolls') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'institute_incomes') = 'array' AND jsonb_array_length(v_tables->'institute_incomes') > 0 THEN
-    INSERT INTO public.institute_incomes SELECT * FROM jsonb_populate_recordset(null::public.institute_incomes, v_tables->'institute_incomes')
+    INSERT INTO public.institute_incomes
+    SELECT * FROM jsonb_populate_recordset(null::public.institute_incomes, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'institute_incomes') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'institute_expenses') = 'array' AND jsonb_array_length(v_tables->'institute_expenses') > 0 THEN
-    INSERT INTO public.institute_expenses SELECT * FROM jsonb_populate_recordset(null::public.institute_expenses, v_tables->'institute_expenses')
+    INSERT INTO public.institute_expenses
+    SELECT * FROM jsonb_populate_recordset(null::public.institute_expenses, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'institute_expenses') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_doubts') = 'array' AND jsonb_array_length(v_tables->'student_doubts') > 0 THEN
-    INSERT INTO public.student_doubts SELECT * FROM jsonb_populate_recordset(null::public.student_doubts, v_tables->'student_doubts')
+    INSERT INTO public.student_doubts
+    SELECT * FROM jsonb_populate_recordset(null::public.student_doubts, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_doubts') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_points_ledger') = 'array' AND jsonb_array_length(v_tables->'student_points_ledger') > 0 THEN
-    INSERT INTO public.student_points_ledger SELECT * FROM jsonb_populate_recordset(null::public.student_points_ledger, v_tables->'student_points_ledger')
+    INSERT INTO public.student_points_ledger
+    SELECT * FROM jsonb_populate_recordset(null::public.student_points_ledger, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_points_ledger') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_badges') = 'array' AND jsonb_array_length(v_tables->'student_badges') > 0 THEN
-    INSERT INTO public.student_badges SELECT * FROM jsonb_populate_recordset(null::public.student_badges, v_tables->'student_badges')
+    INSERT INTO public.student_badges
+    SELECT * FROM jsonb_populate_recordset(null::public.student_badges, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_badges') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_streaks') = 'array' AND jsonb_array_length(v_tables->'student_streaks') > 0 THEN
-    INSERT INTO public.student_streaks SELECT * FROM jsonb_populate_recordset(null::public.student_streaks, v_tables->'student_streaks')
+    INSERT INTO public.student_streaks
+    SELECT * FROM jsonb_populate_recordset(null::public.student_streaks, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_streaks') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_documents') = 'array' AND jsonb_array_length(v_tables->'student_documents') > 0 THEN
-    INSERT INTO public.student_documents SELECT * FROM jsonb_populate_recordset(null::public.student_documents, v_tables->'student_documents')
+    INSERT INTO public.student_documents
+    SELECT * FROM jsonb_populate_recordset(null::public.student_documents, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_documents') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'student_certificates') = 'array' AND jsonb_array_length(v_tables->'student_certificates') > 0 THEN
-    INSERT INTO public.student_certificates SELECT * FROM jsonb_populate_recordset(null::public.student_certificates, v_tables->'student_certificates')
+    INSERT INTO public.student_certificates
+    SELECT * FROM jsonb_populate_recordset(null::public.student_certificates, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'student_certificates') elem
+    ))
     ON CONFLICT DO NOTHING;
   END IF;
 
   IF jsonb_typeof(v_tables->'batch_topic_progress') = 'array' AND jsonb_array_length(v_tables->'batch_topic_progress') > 0 THEN
-    INSERT INTO public.batch_topic_progress SELECT * FROM jsonb_populate_recordset(null::public.batch_topic_progress, v_tables->'batch_topic_progress')
+    INSERT INTO public.batch_topic_progress
+    SELECT * FROM jsonb_populate_recordset(null::public.batch_topic_progress, (
+      SELECT jsonb_agg(elem || jsonb_build_object('institute_id', v_target_inst))
+      FROM jsonb_array_elements(v_tables->'batch_topic_progress') elem
+    ))
+    ON CONFLICT DO NOTHING;
+  END IF;
+
+  IF jsonb_typeof(v_tables->'parent_students') = 'array' AND jsonb_array_length(v_tables->'parent_students') > 0 THEN
+    INSERT INTO public.parent_students (
+      id, parent_profile_id, student_id, relationship_type, is_verified,
+      verified_by, verified_at, created_at, institute_id
+    )
+    SELECT
+      r.id, r.parent_profile_id, r.student_id, r.relationship_type, r.is_verified,
+      r.verified_by, r.verified_at, r.created_at, v_target_inst
+    FROM jsonb_populate_recordset(null::public.parent_students, v_tables->'parent_students') r
+    WHERE EXISTS (SELECT 1 FROM public.students s WHERE s.id = r.student_id AND s.institute_id = v_target_inst)
+    ON CONFLICT DO NOTHING;
+  END IF;
+
+  IF jsonb_typeof(v_tables->'student_batch_history') = 'array' AND jsonb_array_length(v_tables->'student_batch_history') > 0 THEN
+    INSERT INTO public.student_batch_history (
+      id, institute_id, student_id, from_batch_id, to_batch_id, transfer_date,
+      transferred_by, reason, created_at, student_name, student_admission_no,
+      from_batch_name, to_batch_name, transferred_by_name
+    )
+    SELECT
+      r.id, v_target_inst, r.student_id, r.from_batch_id, r.to_batch_id, r.transfer_date,
+      r.transferred_by, r.reason, r.created_at, r.student_name, r.student_admission_no,
+      r.from_batch_name, r.to_batch_name, r.transferred_by_name
+    FROM jsonb_populate_recordset(null::public.student_batch_history, v_tables->'student_batch_history') r
     ON CONFLICT DO NOTHING;
   END IF;
 
@@ -1143,10 +1339,11 @@ CREATE OR REPLACE FUNCTION public.admin_undo_audit_action(p_audit_id UUID)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
+  v_caller_inst uuid;
   v_log record;
   v_prev jsonb;
   v_table_name text;
@@ -1158,10 +1355,17 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner, Admin, or Super Admin can revert actions';
   END IF;
 
+  v_caller_inst := public.current_user_institute_id();
+
   -- 2. Fetch audit log entry
   SELECT * INTO v_log FROM public.audit_logs WHERE id = p_audit_id FOR UPDATE;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Audit log entry not found');
+  END IF;
+
+  -- Cross-tenant isolation check
+  IF v_caller_role != 'super_admin' AND (v_caller_inst IS NULL OR v_log.institute_id IS DISTINCT FROM v_caller_inst) THEN
+    RAISE EXCEPTION 'Unauthorized: Audit log entry belongs to another institute';
   END IF;
 
   IF v_log.is_reverted IS TRUE THEN
@@ -1242,14 +1446,15 @@ BEGIN
       ON CONFLICT (id) DO NOTHING;
     END IF;
 
-  ELSE
-    -- Generic restoration attempt
+  ELSIF v_table_name IN ('student_doubts', 'homework', 'attendance_sessions', 'exams') THEN
     BEGIN
       EXECUTE format('INSERT INTO public.%I SELECT * FROM jsonb_populate_record(null::public.%I, $1) ON CONFLICT (id) DO NOTHING', v_table_name, v_table_name)
       USING v_prev;
     EXCEPTION WHEN OTHERS THEN
-      NULL;
+      RAISE EXCEPTION 'Failed to revert action for table %: %', v_table_name, SQLERRM;
     END;
+  ELSE
+    RETURN jsonb_build_object('success', false, 'error', format('Undo is not supported for table %s', v_table_name));
   END IF;
 
   -- 4. Mark audit log entry as reverted
@@ -1292,7 +1497,7 @@ CREATE OR REPLACE FUNCTION public.admin_purge_demo_data()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth, extensions
+SET search_path = public, auth, extensions, pg_temp
 AS $$
 DECLARE
   v_caller_role public.app_role;
@@ -1307,7 +1512,10 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Only Owner or Super Admin can purge demo data';
   END IF;
 
-  v_caller_inst := coalesce(public.current_user_institute_id(), '11111111-2222-3333-4444-555555555555'::uuid);
+  v_caller_inst := public.current_user_institute_id();
+  IF v_caller_role != 'super_admin' AND v_caller_inst IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: Caller has no institute association';
+  END IF;
 
   -- 2. Pre-purge safety snapshot
   v_snapshot := public._internal_export_institute_snapshot(v_caller_inst);
@@ -1402,9 +1610,21 @@ END;
 $$;
 
 -- ----------------------------------------------------------------------------
--- 14. Grants
+-- 14. Revoke & Grants
 -- ----------------------------------------------------------------------------
 
+-- Revoke execute from public and anon on internal snapshot and all RPCs
+REVOKE EXECUTE ON FUNCTION public._internal_export_institute_snapshot(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_student(UUID, BOOLEAN) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_teacher(UUID, BOOLEAN) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_batch(UUID, BOOLEAN) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_payroll_record(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_export_institute_backup() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_restore_institute_backup(JSONB) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_undo_audit_action(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_purge_demo_data() FROM PUBLIC, anon;
+
+-- Grant execution to authenticated users (role-guarded inside functions)
 GRANT EXECUTE ON FUNCTION public.admin_delete_student(UUID, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_delete_teacher(UUID, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_delete_batch(UUID, BOOLEAN) TO authenticated;

@@ -24,6 +24,8 @@ CREATE TEMP TABLE test_fixtures AS SELECT
   gen_random_uuid() AS test_payroll_id,
   gen_random_uuid() AS test_expense_id;
 
+GRANT SELECT ON test_fixtures TO authenticated;
+
 -- Ensure secondary institute exists for tenant isolation test
 INSERT INTO public.institutes (id, name, slug)
 SELECT other_inst_id, 'Other Institute', 'other-institute'
@@ -474,6 +476,131 @@ BEGIN
 
   RAISE NOTICE 'TEST 9 PASSED: Demo data purge and management preservation verified';
 END $$;
+
+-- ----------------------------------------------------------------------------
+-- TEST 10: Cross-Tenant Isolation
+-- ----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_admin_uid uuid;
+  v_other_owner_uid uuid;
+  v_default_inst_id uuid;
+  v_other_inst_id uuid;
+  v_std_id uuid := gen_random_uuid();
+  v_audit_id uuid := gen_random_uuid();
+  v_backup_id uuid := gen_random_uuid();
+  v_backup_cnt int;
+  v_caught boolean := false;
+BEGIN
+  SELECT admin_uid, other_inst_owner_uid, default_inst_id, other_inst_id
+  INTO v_admin_uid, v_other_owner_uid, v_default_inst_id, v_other_inst_id
+  FROM test_fixtures;
+
+  -- 1. As default institute admin, create student, audit log, and backup
+  PERFORM set_config('request.jwt.claim.sub', v_admin_uid::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+
+  INSERT INTO public.students (id, admission_no, full_name, class_name, status, institute_id)
+  VALUES (v_std_id, 'PC-2026-9040', 'Cross Tenant Student', 'Class 10', 'active', v_default_inst_id);
+
+  INSERT INTO public.audit_logs (
+    id, actor_id, action, table_name, record_id, institute_id,
+    previous_state, new_state, created_at
+  ) VALUES (
+    v_audit_id,
+    v_admin_uid,
+    'CHANGE_STUDENT_STATUS',
+    'students',
+    v_std_id,
+    v_default_inst_id,
+    jsonb_build_object('id', v_std_id, 'status', 'active'),
+    jsonb_build_object('id', v_std_id, 'status', 'rusticated'),
+    now()
+  );
+
+  INSERT INTO public.institute_backups (
+    id, institute_id, backup_type, created_at, created_by, record_counts, snapshot_data, checksum
+  ) VALUES (
+    v_backup_id,
+    v_default_inst_id,
+    'manual_export',
+    now(),
+    v_admin_uid,
+    '{"students": 1}'::jsonb,
+    '{"version": "1.0"}'::jsonb,
+    'fakechecksum'
+  );
+
+  -- 2. Switch caller context to other institute owner
+  PERFORM set_config('request.jwt.claim.sub', v_other_owner_uid::text, true);
+
+  -- 2.1: Cross-tenant student deletion must be rejected
+  v_caught := false;
+  BEGIN
+    PERFORM public.admin_delete_student(v_std_id, true);
+  EXCEPTION WHEN OTHERS THEN
+    v_caught := true;
+  END;
+
+  IF NOT v_caught THEN
+    RAISE EXCEPTION 'TEST 10.1 FAILED: Other institute owner was able to delete student from default institute';
+  END IF;
+
+  -- 2.2: Cross-tenant audit undo must be rejected
+  v_caught := false;
+  BEGIN
+    PERFORM public.admin_undo_audit_action(v_audit_id);
+  EXCEPTION WHEN OTHERS THEN
+    v_caught := true;
+  END;
+
+  IF NOT v_caught THEN
+    RAISE EXCEPTION 'TEST 10.2 FAILED: Other institute owner was able to undo audit action from default institute';
+  END IF;
+
+  -- 2.3: Cross-tenant backup visibility must be blocked by RLS
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  SELECT count(*) INTO v_backup_cnt
+  FROM public.institute_backups
+  WHERE id = v_backup_id;
+  EXECUTE 'RESET ROLE';
+
+  IF v_backup_cnt != 0 THEN
+    RAISE EXCEPTION 'TEST 10.3 FAILED: Other institute owner can view backup of default institute (RLS isolation violation)';
+  END IF;
+
+  -- 2.4: Cross-tenant snapshot export must be rejected
+  v_caught := false;
+  BEGIN
+    PERFORM public._internal_export_institute_snapshot(v_default_inst_id);
+  EXCEPTION WHEN OTHERS THEN
+    v_caught := true;
+  END;
+
+  IF NOT v_caught THEN
+    RAISE EXCEPTION 'TEST 10.4 FAILED: Other institute owner was able to export snapshot of default institute';
+  END IF;
+
+  -- 2.5: Cross-tenant restore attempt must be rejected
+  v_caught := false;
+  BEGIN
+    PERFORM public.admin_restore_institute_backup(jsonb_build_object(
+      'version', '1.0',
+      'institute_id', v_default_inst_id,
+      'tables', '{}'::jsonb
+    ));
+  EXCEPTION WHEN OTHERS THEN
+    v_caught := true;
+  END;
+
+  IF NOT v_caught THEN
+    RAISE EXCEPTION 'TEST 10.5 FAILED: Other institute owner was able to restore backup targeting default institute';
+  END IF;
+
+  RAISE NOTICE 'TEST 10 PASSED: Cross-tenant isolation verified';
+END $$;
+
+SELECT 'ALL 10 TESTS PASSED' AS final_status;
 
 -- ----------------------------------------------------------------------------
 -- CONCLUSION: Roll back all fixture modifications
