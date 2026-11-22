@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   GraduationCap,
   Users,
+  Database,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice } from "../components/common";
 import { settingsService } from "../services/settingsService";
@@ -16,6 +17,7 @@ import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 import type { InstituteSettings, WhatsAppSettings } from "../types/settings";
 import { UserManagementTab } from "../components/users/UserManagementTab";
+import { BackupAndRecoveryTab } from "../components/settings/BackupAndRecoveryTab";
 
 export const Settings: React.FC<{ initialLoading?: boolean }> = ({
   initialLoading = true,
@@ -23,7 +25,7 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
   const { role, user } = useAuth();
   const isManagement = ["super_admin", "owner", "admin"].includes(role);
 
-  const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp" | "users">(
+  const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp" | "users" | "backup">(
     isManagement ? "my-profile" : "my-profile"
   );
 
@@ -283,6 +285,17 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
             >
               <MessageSquare size={17} />
               WhatsApp Cloud API Integration
+            </button>
+            <button
+              onClick={() => setActiveTab("backup")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "backup"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Database size={17} />
+              Backup & Crisis Recovery
             </button>
           </>
         )}
@@ -724,6 +737,11 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
       {/* TAB 4: User Accounts & Logins (Admin, Owner, Super Admin) */}
       {isManagement && activeTab === "users" && (
         <UserManagementTab />
+      )}
+
+      {/* TAB 5: Backup, Crisis Recovery & Clean Handover */}
+      {isManagement && activeTab === "backup" && (
+        <BackupAndRecoveryTab />
       )}
     </div>
   );

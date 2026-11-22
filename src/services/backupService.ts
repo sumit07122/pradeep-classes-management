@@ -326,6 +326,32 @@ export async function purgeDemoData(): Promise<BackupOperationResult> {
   }
 }
 
+/**
+ * Retrieves recent audit logs for the undo/revert hub.
+ */
+export async function listAuditLogs(
+  limit: number = 20
+): Promise<{ data: any[]; error?: string }> {
+  try {
+    const client = await getClient();
+    if (!client) {
+      return { data: [], error: "Supabase client is not configured." };
+    }
+    const { data, error } = await client
+      .from("audit_logs")
+      .select("id, action, entity_type, entity_id, previous_state, new_state, is_reverted, performed_at, performed_by")
+      .order("performed_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return { data: [], error: error.message };
+    }
+    return { data: data || [] };
+  } catch (err: any) {
+    return { data: [], error: err?.message || "Failed to list audit logs." };
+  }
+}
+
 export const backupService = {
   exportBackup,
   downloadBackupFile,
@@ -334,5 +360,6 @@ export const backupService = {
   getBackupSnapshot,
   undoAuditAction,
   purgeDemoData,
+  listAuditLogs,
   setSupabaseClient,
 };
