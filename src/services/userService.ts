@@ -1,5 +1,6 @@
 import type { InstituteUser, CreateUserDTO, ResetPasswordDTO } from "../types/user";
 import type { UserRole } from "../types/auth";
+import { supabase } from "../lib/supabase";
 
 let mockClient: any = null;
 
@@ -10,14 +11,8 @@ export function setSupabaseClient(client: any) {
   mockClient = client;
 }
 
-async function getClient(): Promise<any> {
-  if (mockClient) return mockClient;
-  try {
-    const { supabase } = await import("../lib/supabase");
-    return supabase;
-  } catch {
-    return null;
-  }
+function getClient(): any {
+  return mockClient || supabase;
 }
 
 /**

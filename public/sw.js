@@ -95,7 +95,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Static Assets (JS, CSS, images, icons, fonts) -> Cache-First
+  // B. Navigation requests (SPA HTML entry) -> Network-First with cache fallback
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match('/index.html').then((fallback) => {
+            return fallback || caches.match('/');
+          });
+        })
+    );
+    return;
+  }
+
+  // C. Static Assets (JS, CSS, images, icons, fonts) -> Cache-First
   const isStaticAsset =
     url.pathname.startsWith('/assets/') ||
     STATIC_SHELL.includes(url.pathname) ||
@@ -109,7 +129,7 @@ self.addEventListener('fetch', (event) => {
           fetch(request)
             .then((freshResponse) => {
               if (freshResponse && freshResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, freshResponse));
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, freshResponse)).catch(() => {});
               }
             })
             .catch(() => {/* Ignore background network errors */});
@@ -120,31 +140,11 @@ self.addEventListener('fetch', (event) => {
         return fetch(request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
           }
           return networkResponse;
         });
       })
-    );
-    return;
-  }
-
-  // C. Navigation requests (SPA HTML entry) -> Network-First with cache fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          return caches.match('/index.html').then((fallback) => {
-            return fallback || caches.match('/');
-          });
-        })
     );
     return;
   }
