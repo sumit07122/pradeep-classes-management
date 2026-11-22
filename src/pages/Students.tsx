@@ -6,9 +6,9 @@ import {
   ArrowRightLeft,
   Edit2,
   Eye,
-  Archive,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { studentsService, type LiveBatchOption } from "../services/studentsService";
 import {
@@ -22,11 +22,21 @@ import { AdmissionModal } from "../components/students/AdmissionModal";
 import { StudentDetailDrawer } from "../components/students/StudentDetailDrawer";
 import { BatchTransferModal } from "../components/students/BatchTransferModal";
 import { StudentEditModal } from "../components/students/StudentEditModal";
+import { StudentStatusModal } from "../components/students/StudentStatusModal";
+import { StudentDeleteModal } from "../components/students/StudentDeleteModal";
 import { exportStudentsToCSV } from "../utils/csvExport";
 import type { Student, StudentStatus } from "../types";
 
 const CLASSES = ["All", "Class 12", "Class 11", "Class 10", "Class 9", "Dropper / Repeaters"];
-const STATUSES = ["All", "Active", "On hold", "Inactive"] as const;
+const STATUSES = [
+  { id: "All", label: "All Students" },
+  { id: "active", label: "Active" },
+  { id: "on_hold", label: "On Hold" },
+  { id: "alumni", label: "Alumni / Passed Out" },
+  { id: "rusticated", label: "Rusticated / Suspended" },
+  { id: "dropped_out", label: "Dropped Out" },
+  { id: "archived", label: "Archived" },
+] as const;
 
 export const Students: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -52,6 +62,8 @@ export const Students: React.FC = () => {
   const [selectedStudentForDrawer, setSelectedStudentForDrawer] = useState<Student | null>(null);
   const [selectedStudentForTransfer, setSelectedStudentForTransfer] = useState<Student | null>(null);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null);
+  const [selectedStudentForStatus, setSelectedStudentForStatus] = useState<Student | null>(null);
+  const [selectedStudentForDelete, setSelectedStudentForDelete] = useState<Student | null>(null);
 
   // Load batches on mount
   useEffect(() => {
@@ -119,20 +131,6 @@ export const Students: React.FC = () => {
     loadStudents();
   };
 
-  const handleArchiveStudent = async (student: Student) => {
-    if (!confirm(`Are you sure you want to deactivate student ${student.full_name}?`)) {
-      return;
-    }
-
-    const res = await studentsService.archiveStudent(student.id);
-    if (!res.success) {
-      setNotice({ message: res.error || "Failed to archive student.", type: "error" });
-    } else {
-      setNotice({ message: `Student ${student.full_name} deactivated.`, type: "success" });
-      loadStudents();
-    }
-  };
-
   const handleExport = () => {
     exportStudentsToCSV(students);
   };
@@ -173,6 +171,27 @@ export const Students: React.FC = () => {
             New Admission
           </Button>
         </div>
+      </div>
+
+      {/* 6-Category Lifecycle Tabs */}
+      <div className="flex border-b border-slate-200 gap-6 text-xs font-semibold overflow-x-auto pb-1">
+        {STATUSES.map((st) => (
+          <button
+            key={st.id}
+            type="button"
+            onClick={() => {
+              setSelectedStatus(st.id as any);
+              setPage(1);
+            }}
+            className={`pb-2.5 transition border-b-2 cursor-pointer whitespace-nowrap ${
+              selectedStatus === st.id
+                ? "border-[#16466f] text-[#16466f] font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            {st.label}
+          </button>
+        ))}
       </div>
 
       {/* Directory Filter Toolbar */}
@@ -236,8 +255,8 @@ export const Students: React.FC = () => {
               className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white outline-none focus:border-[#16466f]"
             >
               {STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {st === "All" ? "All Statuses" : st}
+                <option key={st.id} value={st.id}>
+                  {st.label}
                 </option>
               ))}
             </select>
@@ -313,53 +332,71 @@ export const Students: React.FC = () => {
                     <td className="text-xs text-slate-600">{s.phone}</td>
 
                     <td>
-                      <Badge
-                        variant={
-                          s.status === "Active"
-                            ? "success"
-                            : s.status === "On hold"
-                              ? "warning"
-                              : "neutral"
-                        }
-                        size="sm"
-                        showDot
-                      >
-                        {s.status}
-                      </Badge>
+                      {(() => {
+                        const norm = (s.status || "active").toLowerCase().replace(/\s+/g, "_");
+                        const getProps = () => {
+                          switch (norm) {
+                            case "active":
+                              return { variant: "success" as const, label: "Active" };
+                            case "on_hold":
+                              return { variant: "warning" as const, label: "On Hold" };
+                            case "alumni":
+                              return { variant: "blue" as const, label: "Alumni" };
+                            case "rusticated":
+                              return { variant: "red" as const, label: "Rusticated" };
+                            case "dropped_out":
+                              return { variant: "amber" as const, label: "Dropped Out" };
+                            case "archived":
+                            default:
+                              return { variant: "neutral" as const, label: "Archived" };
+                          }
+                        };
+                        const bp = getProps();
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStudentForStatus(s)}
+                            className="cursor-pointer"
+                            title="Click to update student status"
+                          >
+                            <Badge variant={bp.variant} size="sm" showDot>
+                              {bp.label}
+                            </Badge>
+                          </button>
+                        );
+                      })()}
                     </td>
 
                     <td>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setSelectedStudentForDrawer(s)}
-                          className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded-md transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
                           title="View Profile"
                         >
                           <Eye size={15} />
                         </button>
                         <button
                           onClick={() => setSelectedStudentForTransfer(s)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
                           title="Transfer Batch"
                         >
                           <ArrowRightLeft size={15} />
                         </button>
                         <button
                           onClick={() => setSelectedStudentForEdit(s)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
                           title="Edit Student"
                         >
                           <Edit2 size={15} />
                         </button>
-                        {s.status === "Active" && (
-                          <button
-                            onClick={() => handleArchiveStudent(s)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="Deactivate Student"
-                          >
-                            <Archive size={15} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setSelectedStudentForDelete(s)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                          title="Archive or Delete Student"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -433,6 +470,28 @@ export const Students: React.FC = () => {
         onClose={() => setSelectedStudentForEdit(null)}
         student={selectedStudentForEdit}
         onSuccess={handleStudentUpdated}
+      />
+
+      {/* Student Lifecycle Status Modal */}
+      <StudentStatusModal
+        isOpen={Boolean(selectedStudentForStatus)}
+        onClose={() => setSelectedStudentForStatus(null)}
+        student={selectedStudentForStatus}
+        onSuccess={(msg) => {
+          setNotice({ message: msg, type: "success" });
+          loadStudents();
+        }}
+      />
+
+      {/* Student Deletion & Archive Modal */}
+      <StudentDeleteModal
+        isOpen={Boolean(selectedStudentForDelete)}
+        onClose={() => setSelectedStudentForDelete(null)}
+        student={selectedStudentForDelete}
+        onSuccess={(msg) => {
+          setNotice({ message: msg, type: "success" });
+          loadStudents();
+        }}
       />
     </div>
   );

@@ -53,12 +53,8 @@ export const studentsService = {
       }
 
       if (params?.status && params.status !== "All") {
-        const dbStatus =
-          params.status === "Active"
-            ? "active"
-            : params.status === "On hold"
-            ? "on_hold"
-            : "inactive";
+        const raw = params.status.toLowerCase().replace(/\s+/g, "_");
+        const dbStatus = raw === "inactive" ? "archived" : raw;
         query = query.eq("status", dbStatus);
       }
 
@@ -98,12 +94,10 @@ export const studentsService = {
         parent_email: row.parent_email,
         notes: row.notes,
         photo_url: row.photo_url,
-        status:
-          row.status === "active"
-            ? "Active"
-            : row.status === "on_hold"
-            ? "On hold"
-            : "Inactive",
+        status: (row.status || "active") as StudentStatus,
+        status_reason: row.status_reason || undefined,
+        status_changed_at: row.status_changed_at || undefined,
+        exit_date: row.exit_date || undefined,
         joined_on: row.joined_on,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -154,12 +148,10 @@ export const studentsService = {
         parent_email: data.parent_email,
         notes: data.notes,
         photo_url: data.photo_url,
-        status:
-          data.status === "active"
-            ? "Active"
-            : data.status === "on_hold"
-            ? "On hold"
-            : "Inactive",
+        status: (data.status || "active") as StudentStatus,
+        status_reason: data.status_reason || undefined,
+        status_changed_at: data.status_changed_at || undefined,
+        exit_date: data.exit_date || undefined,
         joined_on: data.joined_on,
         created_at: data.created_at,
         updated_at: data.updated_at,
