@@ -179,7 +179,6 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
       }
 
       setShowModal(false);
-      resetAddForm();
       setCreatedCredentials({
         name: createdTeacher.full_name,
         username: userRes.data.email || email.trim(),
@@ -188,6 +187,7 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
         role: "teacher",
         isReset: false,
       });
+      resetAddForm();
       setNotice(`Faculty ${createdTeacher.full_name} registered successfully with portal access.`);
       loadData();
     } else {
@@ -743,7 +743,10 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
       {/* Credentials Summary & WhatsApp Dispatch */}
       <CredentialsModal
         isOpen={Boolean(createdCredentials)}
-        onClose={() => setCreatedCredentials(null)}
+        onClose={() => {
+          setCreatedCredentials(null);
+          resetAddForm();
+        }}
         credentials={createdCredentials}
         whatsAppButtonLabel="Send Faculty Portal Access via WhatsApp"
         title="Faculty Portal Account Provisioned"

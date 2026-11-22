@@ -85,9 +85,15 @@ export const Students: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const handleStudentAdded = (newStudent: Student) => {
+  const handleStudentAdded = (
+    newStudent: Student,
+    options?: { credentialsProvisioned?: boolean }
+  ) => {
+    const credsText = options?.credentialsProvisioned
+      ? " Portal login credentials created and ready for dispatch."
+      : "";
     setNotice({
-      message: `Student ${newStudent.full_name} enrolled successfully with Admission ID ${newStudent.admission_no}. Portal login credentials created and ready for dispatch.`,
+      message: `Student ${newStudent.full_name} enrolled successfully with Admission ID ${newStudent.admission_no}.${credsText}`,
       type: "success",
     });
     setPage(1);

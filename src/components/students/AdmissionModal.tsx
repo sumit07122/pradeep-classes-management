@@ -18,7 +18,7 @@ import type { Student } from "../../types";
 interface AdmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (student: Student) => void;
+  onSuccess: (student: Student, options?: { credentialsProvisioned?: boolean }) => void;
 }
 
 const CLASSES = ["Class 12", "Class 11", "Class 10", "Class 9", "Dropper / Repeaters"];
@@ -179,12 +179,12 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
         setError(
           `Student enrolled with Admission ID ${createdStudent.admission_no}, but creating portal login failed: ${userRes.error || "Unknown error"}. You can provision credentials manually from Settings > User Accounts.`
         );
-        onSuccess(createdStudent);
+        onSuccess(createdStudent, { credentialsProvisioned: false });
         return;
       }
 
-      // Notify parent page of the newly enrolled student
-      onSuccess(createdStudent);
+      // Notify parent page of the newly enrolled student with credentials provisioned flag
+      onSuccess(createdStudent, { credentialsProvisioned: true });
 
       // Present clean Credentials modal
       setCreatedCredentials({
@@ -200,7 +200,7 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
       });
     } else {
       setIsSubmitting(false);
-      onSuccess(createdStudent);
+      onSuccess(createdStudent, { credentialsProvisioned: false });
       resetForm();
       onClose();
     }
