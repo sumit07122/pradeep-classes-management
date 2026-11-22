@@ -5,17 +5,26 @@ import { ShieldX, ArrowLeft, LogOut, BookOpen, Clock, FolderDown, Users } from "
 import { Button } from "../components/common";
 
 export const Unauthorized: React.FC = () => {
-  const { role, signOut } = useAuth();
+  const { role, isAuthenticated, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleReturnHome = () => {
-    if (role === "student") {
-      navigate("/portal");
-    } else if (role === "super_admin") {
-      navigate("/platform");
-    } else {
-      navigate("/dashboard");
+    if (!isAuthenticated) {
+      navigate("/login", { replace: true });
+      return;
     }
+    if (role === "student") {
+      navigate("/portal", { replace: true });
+    } else if (role === "super_admin") {
+      navigate("/platform", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
   };
 
   return (
@@ -34,9 +43,18 @@ export const Unauthorized: React.FC = () => {
         </h1>
 
         <p className="text-xs text-slate-500 leading-relaxed mb-6">
-          Your current account role (
-          <b className="capitalize text-slate-700">{role}</b>) does not have
-          authorization to access this resource or administrative module.
+          {isAuthenticated ? (
+            <>
+              Your current account role (
+              <b className="capitalize text-slate-700">{role}</b>) does not have
+              authorization to access this resource or administrative module.
+            </>
+          ) : (
+            <>
+              You do not have authorization to access this resource or administrative
+              module. Please sign in with an authorized account.
+            </>
+          )}
         </p>
 
         <div className="flex flex-col gap-2.5">
@@ -47,10 +65,14 @@ export const Unauthorized: React.FC = () => {
             icon={<ArrowLeft size={16} />}
             className="w-full"
           >
-            {role === "student" ? "Return to Student Portal" : "Return to Authorized Workspace"}
+            {!isAuthenticated
+              ? "Return to Sign In"
+              : role === "student"
+              ? "Return to Student Portal"
+              : "Return to Authorized Workspace"}
           </Button>
 
-          {role === "student" && (
+          {isAuthenticated && role === "student" && (
             <div className="pt-2 pb-1 border-t border-slate-100 mt-2">
               <div className="text-[11px] font-bold text-slate-600 mb-2">Student Authorized Links:</div>
               <div className="grid grid-cols-2 gap-2 text-left">
@@ -89,11 +111,11 @@ export const Unauthorized: React.FC = () => {
           <Button
             variant="secondary"
             size="md"
-            onClick={signOut}
+            onClick={handleSignOut}
             icon={<LogOut size={16} />}
             className="w-full"
           >
-            Sign in as Different User
+            {isAuthenticated ? "Sign in as Different User" : "Sign In to Account"}
           </Button>
         </div>
 

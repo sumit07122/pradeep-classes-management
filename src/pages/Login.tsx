@@ -12,7 +12,33 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || "/dashboard";
+  const state = location.state as {
+    from?: { pathname?: string } | string;
+    unauthorized?: boolean;
+    requiredRoles?: string[];
+    currentRole?: string;
+  } | null;
+
+  const isUnauthorized = Boolean(state?.unauthorized);
+  const currentRole = state?.currentRole || "user";
+  const requiredRoles = state?.requiredRoles || [];
+  const requiredRolesText =
+    requiredRoles.length > 0 ? requiredRoles.join(" or ") : "authorized";
+
+  const from =
+    typeof state?.from === "string"
+      ? state.from
+      : state?.from?.pathname || "/dashboard";
+
+  const handleReturnToWorkspace = () => {
+    if (currentRole === "student") {
+      navigate("/portal", { replace: true });
+    } else if (currentRole === "super_admin") {
+      navigate("/platform", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +93,24 @@ export const Login: React.FC = () => {
               Enter your credentials to access your academic dashboard.
             </p>
           </div>
+
+          {isUnauthorized && (
+            <div className="mb-5 space-y-3">
+              <AlertNotice
+                type="warning"
+                message={`Access Restricted: You are currently signed in as '${currentRole}'. That section requires ${requiredRolesText} clearance.`}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                className="w-full justify-center"
+                onClick={handleReturnToWorkspace}
+              >
+                ← Return to Authorized Workspace
+              </Button>
+            </div>
+          )}
 
           {authError && (
             <AlertNotice

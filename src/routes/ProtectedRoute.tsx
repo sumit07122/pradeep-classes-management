@@ -34,9 +34,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Role authorization check
+  // Role authorization check: redirect directly to login with context
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    return <Navigate to="/unauthorized" state={{ attemptedPath: location.pathname }} replace />;
+    return (
+      <Navigate
+        to="/login"
+        state={{
+          from: location,
+          unauthorized: true,
+          requiredRoles: allowedRoles,
+          currentRole: role,
+        }}
+        replace
+      />
+    );
   }
 
   return children ? <>{children}</> : null;
