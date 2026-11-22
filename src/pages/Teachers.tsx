@@ -6,7 +6,6 @@ import {
   Trash2,
   CheckCircle2,
   Banknote,
-  AlertTriangle,
   KeyRound,
   RefreshCw,
   Copy,
@@ -19,6 +18,8 @@ import { teachersService } from "../services/teachersService";
 import { userService } from "../services/userService";
 import { generateSecurePassword } from "../components/users/UserManagementTab";
 import { CredentialsModal, type CredentialsInfo } from "../components/users/CredentialsModal";
+import { TeacherStatusModal } from "../components/teachers/TeacherStatusModal";
+import { TeacherDeleteModal } from "../components/teachers/TeacherDeleteModal";
 import {
   Button,
   Modal,
@@ -46,6 +47,8 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
+  const [statusTeacher, setStatusTeacher] = useState<Teacher | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "on_leave" | "relieved">("all");
 
   const [notice, setNotice] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -247,33 +250,21 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
     }
   };
 
-  const handleDeleteTeacher = async () => {
-    if (!deletingTeacher) return;
-    setIsSubmitting(true);
-    setErrorNotice(null);
-
-    const res = await teachersService.deleteTeacher(deletingTeacher.id);
-    setIsSubmitting(false);
-
-    if (!res.success) {
-      setErrorNotice(res.error || "Failed to delete teacher.");
-    } else {
-      setNotice(`Faculty ${deletingTeacher.full_name} deleted successfully.`);
-      setDeletingTeacher(null);
-      loadData();
-    }
+  const getTeacherEffectiveStatus = (t: Teacher): "active" | "on_leave" | "relieved" => {
+    if (t.status === "on_leave") return "on_leave";
+    if (t.status === "relieved") return "relieved";
+    if (t.status === "active") return "active";
+    return t.is_active ? "active" : "relieved";
   };
 
-  const handleToggleStatus = async (t: Teacher) => {
-    const nextStatus = !t.is_active;
-    const res = await teachersService.toggleTeacherStatus(t.id, nextStatus);
-    if (res.success) {
-      setNotice(`Status for ${t.full_name} set to ${nextStatus ? "Active" : "Inactive"}.`);
-      loadData();
-    } else {
-      setErrorNotice(res.error || "Failed to update status.");
-    }
-  };
+  const activeCount = teachers.filter((t) => getTeacherEffectiveStatus(t) === "active").length;
+  const onLeaveCount = teachers.filter((t) => getTeacherEffectiveStatus(t) === "on_leave").length;
+  const relievedCount = teachers.filter((t) => getTeacherEffectiveStatus(t) === "relieved").length;
+
+  const filteredTeachers = teachers.filter((t) => {
+    if (statusFilter === "all") return true;
+    return getTeacherEffectiveStatus(t) === statusFilter;
+  });
 
   return (
     <div className="space-y-5">
@@ -303,107 +294,196 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
         )}
       </div>
 
+      {/* Lifecycle Status Tabs */}
+      <div className="flex border-b border-slate-200 gap-6 text-xs font-semibold overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          className={`pb-2.5 transition border-b-2 cursor-pointer ${
+            statusFilter === "all"
+              ? "border-[#16466f] text-[#16466f] font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          All Faculty ({teachers.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("active")}
+          className={`pb-2.5 transition border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === "active"
+              ? "border-emerald-600 text-emerald-800 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+          Active ({activeCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("on_leave")}
+          className={`pb-2.5 transition border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === "on_leave"
+              ? "border-amber-500 text-amber-800 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+          On Leave ({onLeaveCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("relieved")}
+          className={`pb-2.5 transition border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === "relieved"
+              ? "border-slate-600 text-slate-800 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+          Relieved / Resigned ({relievedCount})
+        </button>
+      </div>
+
       <section className="panel directory-panel">
         <div className="panel-heading">
           <div>
-            <h3>Active Faculty ({teachers.length})</h3>
+            <h3>
+              {statusFilter === "all"
+                ? `Faculty Members (${teachers.length})`
+                : statusFilter === "active"
+                ? `Active Faculty (${activeCount})`
+                : statusFilter === "on_leave"
+                ? `Faculty On Leave (${onLeaveCount})`
+                : `Relieved Faculty (${relievedCount})`}
+            </h3>
             <p>Teaching staff and remuneration configurations at Pradeep Classes</p>
           </div>
         </div>
 
         {loading ? (
           <LoadingSpinner label="Loading faculty directory..." />
-        ) : teachers.length === 0 ? (
+        ) : filteredTeachers.length === 0 ? (
           <EmptyState
-            title="No faculty members recorded"
-            description="Add your first teacher to assign subjects and batches for attendance tracking."
-            actionLabel={canManage ? "Add teacher" : undefined}
-            onAction={canManage ? openAddModal : undefined}
+            title="No faculty members found"
+            description={
+              statusFilter === "all"
+                ? "Add your first teacher to assign subjects and batches for attendance tracking."
+                : `No faculty members currently matching the "${statusFilter.replace("_", " ")}" filter.`
+            }
+            actionLabel={canManage && statusFilter === "all" ? "Add teacher" : undefined}
+            onAction={canManage && statusFilter === "all" ? openAddModal : undefined}
           />
         ) : (
           <div className="teacher-grid">
-            {teachers.map((t) => (
-              <div className="teacher-card relative" key={t.id}>
-                <div className="flex items-start justify-between">
-                  <div className="teacher-avatar">
-                    {t.full_name
-                      .split(" ")
-                      .map((x) => x[0])
-                      .slice(0, 2)
-                      .join("")}
+            {filteredTeachers.map((t) => {
+              const effStatus = getTeacherEffectiveStatus(t);
+              return (
+                <div className="teacher-card relative" key={t.id}>
+                  <div className="flex items-start justify-between">
+                    <div className="teacher-avatar">
+                      {t.full_name
+                        .split(" ")
+                        .map((x) => x[0])
+                        .slice(0, 2)
+                        .join("")}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => canManage && setStatusTeacher(t)}
+                        title="Click to change faculty status"
+                        className={canManage ? "cursor-pointer" : ""}
+                      >
+                        <Badge
+                          variant={
+                            effStatus === "active"
+                              ? "green"
+                              : effStatus === "on_leave"
+                              ? "amber"
+                              : "neutral"
+                          }
+                          size="sm"
+                        >
+                          {effStatus === "active"
+                            ? "Active"
+                            : effStatus === "on_leave"
+                            ? "On Leave"
+                            : "Relieved"}
+                        </Badge>
+                      </button>
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => openEdit(t)}
+                            className="p-1 text-slate-400 hover:text-[#16466f] transition cursor-pointer"
+                            title="Edit Faculty & Salary"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => setDeletingTeacher(t)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                            title="Delete or Relieve Faculty Member"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant={t.is_active ? "green" : "red"} size="sm">
-                      {t.is_active ? "Active" : "Inactive"}
-                    </Badge>
+
+                  <h3>{t.full_name}</h3>
+                  <p className="font-semibold text-slate-600">{t.subject}</p>
+
+                  {/* Remuneration Badge */}
+                  <div className="mt-2.5 p-2 rounded-lg bg-emerald-50/80 border border-emerald-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                      <Banknote size={14} className="text-emerald-600" />
+                      <span>Remuneration</span>
+                    </div>
+                    <span className="font-mono font-extrabold text-emerald-900">
+                      {t.salary_config?.calculation_type === "monthly_fixed" && (
+                        <>₹{t.salary_config.base_amount.toLocaleString("en-IN")}/mo</>
+                      )}
+                      {t.salary_config?.calculation_type === "per_lecture" && (
+                        <>₹{t.salary_config.per_lecture_rate.toLocaleString("en-IN")}/lec</>
+                      )}
+                      {t.salary_config?.calculation_type === "hourly" && (
+                        <>₹{t.salary_config.per_lecture_rate.toLocaleString("en-IN")}/hr</>
+                      )}
+                      {!t.salary_config && <span className="text-slate-400 font-normal">Not configured</span>}
+                    </span>
+                  </div>
+
+                  <div className="teacher-batches mt-2">
+                    <span>ASSIGNED BATCHES</span>
+                    {t.assigned_batches && t.assigned_batches.length > 0 ? (
+                      t.assigned_batches.map((b) => <i key={b}>{b}</i>)
+                    ) : (
+                      <span className="text-slate-400 text-xs italic">None assigned</span>
+                    )}
+                  </div>
+
+                  <div className="teacher-phone flex items-center justify-between text-slate-500 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <Phone size={13} />
+                      <span>{t.phone || "No phone provided"}</span>
+                    </div>
+
                     {canManage && (
-                      <>
-                        <button
-                          onClick={() => openEdit(t)}
-                          className="p-1 text-slate-400 hover:text-[#16466f] transition"
-                          title="Edit Faculty & Salary"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => setDeletingTeacher(t)}
-                          className="p-1 text-slate-400 hover:text-rose-600 transition"
-                          title="Delete Faculty Member"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </>
+                      <button
+                        onClick={() => setStatusTeacher(t)}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-slate-800 transition cursor-pointer"
+                        title="Change status or mark relieved"
+                      >
+                        {effStatus === "active" ? "Deactivate" : "Update Status"}
+                      </button>
                     )}
                   </div>
                 </div>
-
-                <h3>{t.full_name}</h3>
-                <p className="font-semibold text-slate-600">{t.subject}</p>
-
-                {/* Remuneration Badge */}
-                <div className="mt-2.5 p-2 rounded-lg bg-emerald-50/80 border border-emerald-100 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
-                    <Banknote size={14} className="text-emerald-600" />
-                    <span>Remuneration</span>
-                  </div>
-                  <span className="font-mono font-extrabold text-emerald-900">
-                    {t.salary_config?.calculation_type === "monthly_fixed" && (
-                      <>₹{t.salary_config.base_amount.toLocaleString("en-IN")}/mo</>
-                    )}
-                    {t.salary_config?.calculation_type === "per_lecture" && (
-                      <>₹{t.salary_config.per_lecture_rate.toLocaleString("en-IN")}/lec</>
-                    )}
-                    {t.salary_config?.calculation_type === "hourly" && (
-                      <>₹{t.salary_config.per_lecture_rate.toLocaleString("en-IN")}/hr</>
-                    )}
-                    {!t.salary_config && <span className="text-slate-400 font-normal">Not configured</span>}
-                  </span>
-                </div>
-
-                <div className="teacher-batches mt-2">
-                  <span>ASSIGNED BATCHES</span>
-                  {t.assigned_batches.map((b) => (
-                    <i key={b}>{b}</i>
-                  ))}
-                </div>
-
-                <div className="teacher-phone flex items-center justify-between text-slate-500 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-1.5">
-                    <Phone size={13} />
-                    <span>{t.phone || "No phone provided"}</span>
-                  </div>
-
-                  {canManage && (
-                    <button
-                      onClick={() => handleToggleStatus(t)}
-                      className="text-[11px] font-semibold text-slate-400 hover:text-slate-800 transition"
-                    >
-                      {t.is_active ? "Deactivate" : "Activate"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -697,48 +777,27 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
         </Modal>
       )}
 
-      {/* Delete Teacher Confirmation Modal */}
-      {deletingTeacher && (
-        <Modal
-          isOpen={!!deletingTeacher}
-          onClose={() => setDeletingTeacher(null)}
-          title="Delete Faculty Member"
-        >
-          <div className="space-y-4">
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={20} />
-              <div>
-                <h4 className="font-bold text-sm text-rose-900">
-                  Delete {deletingTeacher.full_name}?
-                </h4>
-                <p className="text-xs text-rose-700 mt-1 leading-relaxed">
-                  This action will permanently delete the teacher record, their salary configuration, and batch assignments.
-                  If the faculty has recorded class sessions or payroll history, the system will prevent deletion to preserve academic integrity.
-                </p>
-              </div>
-            </div>
+      {/* Teacher Status Lifecycle Modal */}
+      <TeacherStatusModal
+        isOpen={Boolean(statusTeacher)}
+        onClose={() => setStatusTeacher(null)}
+        teacher={statusTeacher}
+        onSuccess={(msg) => {
+          setNotice(msg);
+          loadData();
+        }}
+      />
 
-            <div className="modal-actions pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeletingTeacher(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                isLoading={isSubmitting}
-                onClick={handleDeleteTeacher}
-                icon={<Trash2 size={15} />}
-              >
-                Confirm Delete
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* Teacher Delete & Cascade Purge Modal */}
+      <TeacherDeleteModal
+        isOpen={Boolean(deletingTeacher)}
+        onClose={() => setDeletingTeacher(null)}
+        teacher={deletingTeacher}
+        onSuccess={(msg) => {
+          setNotice(msg);
+          loadData();
+        }}
+      />
 
       {/* Credentials Summary & WhatsApp Dispatch */}
       <CredentialsModal
