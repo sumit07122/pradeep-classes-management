@@ -38,9 +38,6 @@ export interface CreateUserDTO {
   phone?: string;
 }
 
-export interface ResetPasswordDTO {
-  userId?: string;
-  user_id?: string;
-  newPassword?: string;
-  new_password?: string;
-}
+export type ResetPasswordDTO =
+  | { userId: string; newPassword: string; user_id?: string; new_password?: string }
+  | { user_id: string; new_password: string; userId?: string; newPassword?: string };

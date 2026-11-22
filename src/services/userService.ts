@@ -150,10 +150,10 @@ export async function createInstituteUser(
       linked_student: linkedStudent,
       linked_teacher: linkedTeacher,
       linked_student_id: data.linked_student_id || null,
-      linked_student_name: data.linked_student_name || null,
+      linked_student_name: data.linked_student_name || (data.linked_student_id ? dto.full_name : null),
       linked_admission_no: data.linked_admission_no || null,
       linked_teacher_id: data.linked_teacher_id || null,
-      linked_teacher_name: data.linked_teacher_name || null,
+      linked_teacher_name: data.linked_teacher_name || (data.linked_teacher_id ? dto.full_name : null),
     };
 
     return { data: newUser };
@@ -222,7 +222,7 @@ export async function toggleUserStatus(
 
     const { data, error } = await client.rpc("admin_toggle_user_status", {
       p_user_id: userId,
-      p_is_active: isActive,
+      p_is_active: Boolean(isActive),
     });
 
     if (error) {

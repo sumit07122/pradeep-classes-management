@@ -191,6 +191,8 @@ export async function runUserServiceTests() {
     assertEqual(result.data?.role, "student");
     assertTrue(result.data?.is_active ?? false);
     assertEqual(result.data?.linked_student_id, "s9999999-9999-9999-9999-999999999999");
+    assertEqual(result.data?.linked_student_name, "Anita Roy");
+    assertEqual(result.data?.linked_teacher_name, null);
 
     assertEqual(mockRpcCalls.length, 1);
     assertEqual(mockRpcCalls[0].fn, "admin_create_institute_user");
@@ -265,6 +267,61 @@ export async function runUserServiceTests() {
     assertEqual(result.error, "User with email existing@pradeepclasses.in already exists");
 
     console.log("✓ createInstituteUser handles RPC errors correctly");
+  }
+
+  // --------------------------------------------------------------------------
+  // Test 5b: createInstituteUser - client-side validation without making RPC calls
+  // --------------------------------------------------------------------------
+  {
+    // 1. Empty full name
+    resetMocks();
+    const resEmptyName = await userService.createInstituteUser({
+      full_name: "   ",
+      password: "Password123!",
+      role: "student",
+      student_id: "s1111111-1111-1111-1111-111111111111",
+    });
+    assertEqual(resEmptyName.data, null);
+    assertEqual(resEmptyName.error, "Full name is required.");
+    assertEqual(mockRpcCalls.length, 0, "No RPC call should be made for empty full name");
+
+    // 2. Password < 6 chars
+    resetMocks();
+    const resShortPassword = await userService.createInstituteUser({
+      full_name: "Anita Roy",
+      password: "12345",
+      role: "student",
+      student_id: "s1111111-1111-1111-1111-111111111111",
+    });
+    assertEqual(resShortPassword.data, null);
+    assertEqual(resShortPassword.error, "Password must be at least 6 characters long.");
+    assertEqual(mockRpcCalls.length, 0, "No RPC call should be made for password < 6 chars");
+
+    // 3. Missing role
+    resetMocks();
+    const resMissingRole = await userService.createInstituteUser({
+      full_name: "Anita Roy",
+      password: "Password123!",
+      role: "" as any,
+      student_id: "s1111111-1111-1111-1111-111111111111",
+    });
+    assertEqual(resMissingRole.data, null);
+    assertEqual(resMissingRole.error, "User role is required.");
+    assertEqual(mockRpcCalls.length, 0, "No RPC call should be made for missing role");
+
+    // 4. Missing email when not linked to a student
+    resetMocks();
+    const resMissingEmail = await userService.createInstituteUser({
+      full_name: "Prof. Verma",
+      password: "Password123!",
+      role: "teacher",
+      email: "   ",
+    });
+    assertEqual(resMissingEmail.data, null);
+    assertEqual(resMissingEmail.error, "Email is required when creating a non-student user.");
+    assertEqual(mockRpcCalls.length, 0, "No RPC call should be made for non-student without email");
+
+    console.log("✓ createInstituteUser client-side validation blocks invalid calls before RPC");
   }
 
   // --------------------------------------------------------------------------
@@ -347,6 +404,11 @@ export async function runUserServiceTests() {
       p_user_id: "u1111111-1111-1111-1111-111111111111",
       p_is_active: false,
     });
+
+    // Test boolean coercion for non-boolean input
+    resetMocks();
+    await userService.toggleUserStatus("u1111111-1111-1111-1111-111111111111", 1 as any);
+    assertEqual(mockRpcCalls[0].params.p_is_active, true);
 
     console.log("✓ toggleUserStatus sends exact RPC parameters and returns success");
   }
