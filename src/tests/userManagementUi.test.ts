@@ -252,7 +252,7 @@ export async function runUserManagementUiTests() {
         React.createElement(
           AuthContext.Provider,
           { value: createMockAuthContext("admin") },
-          React.createElement(Settings, null)
+          React.createElement(Settings, { initialLoading: false })
         )
       )
     );
@@ -269,7 +269,7 @@ export async function runUserManagementUiTests() {
         React.createElement(
           AuthContext.Provider,
           { value: createMockAuthContext("student") },
-          React.createElement(Settings, null)
+          React.createElement(Settings, { initialLoading: false })
         )
       )
     );
@@ -286,7 +286,7 @@ export async function runUserManagementUiTests() {
         React.createElement(
           AuthContext.Provider,
           { value: createMockAuthContext("teacher") },
-          React.createElement(Settings, null)
+          React.createElement(Settings, { initialLoading: false })
         )
       )
     );
@@ -303,7 +303,7 @@ export async function runUserManagementUiTests() {
         React.createElement(
           AuthContext.Provider,
           { value: createMockAuthContext("super_admin") },
-          React.createElement(Settings, null)
+          React.createElement(Settings, { initialLoading: false })
         )
       )
     );
@@ -320,7 +320,7 @@ export async function runUserManagementUiTests() {
         React.createElement(
           AuthContext.Provider,
           { value: createMockAuthContext("owner") },
-          React.createElement(Settings, null)
+          React.createElement(Settings, { initialLoading: false })
         )
       )
     );

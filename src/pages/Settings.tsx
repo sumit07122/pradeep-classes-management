@@ -18,7 +18,7 @@ import type { InstituteSettings, WhatsAppSettings } from "../types/settings";
 import { UserManagementTab } from "../components/users/UserManagementTab";
 
 export const Settings: React.FC<{ initialLoading?: boolean }> = ({
-  initialLoading = false,
+  initialLoading = true,
 }) => {
   const { role, user } = useAuth();
   const isManagement = ["super_admin", "owner", "admin"].includes(role);

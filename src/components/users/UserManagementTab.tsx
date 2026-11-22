@@ -328,19 +328,14 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
 
     const student = availableStudents.find((s) => s.id === studentId);
     if (student) {
-      if (!createFullName || createFullName === "") {
-        setCreateFullName(student.full_name);
-      }
-      if (!createPhone && student.phone) {
-        setCreatePhone(student.phone);
-      }
-      if (student.email) {
-        setCreateEmail(student.email);
-      } else if (student.admission_no) {
-        // Suggested email format based on admission number
-        const cleanAdm = student.admission_no.toLowerCase().replace(/[^a-z0-9]/g, "");
-        setCreateEmail(`${cleanAdm}@pradeepclasses.in`);
-      }
+      setCreateFullName(student.full_name);
+      setCreatePhone(student.phone || "");
+      const cleanAdm = student.admission_no
+        ? student.admission_no.toLowerCase().replace(/[^a-z0-9]/g, "")
+        : "";
+      setCreateEmail(
+        student.email || (cleanAdm ? `${cleanAdm}@pradeepclasses.in` : "")
+      );
     }
   };
 
@@ -351,15 +346,9 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
 
     const teacher = availableTeachers.find((t) => t.id === teacherId);
     if (teacher) {
-      if (!createFullName || createFullName === "") {
-        setCreateFullName(teacher.full_name);
-      }
-      if (!createPhone && teacher.phone) {
-        setCreatePhone(teacher.phone);
-      }
-      if (teacher.email) {
-        setCreateEmail(teacher.email);
-      }
+      setCreateFullName(teacher.full_name);
+      setCreatePhone(teacher.phone || "");
+      setCreateEmail(teacher.email || "");
     }
   };
 
@@ -378,6 +367,10 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
     }
     if (createRole !== "student" && !createEmail.trim()) {
       setCreateModalError("Email is required for staff, teacher, and admin accounts.");
+      return;
+    }
+    if (createRole === "student" && !selectedStudentId && !createEmail.trim()) {
+      setCreateModalError("Please provide an email/username or link an existing student record.");
       return;
     }
 
@@ -490,6 +483,16 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
   const handleToggleStatus = async (user: InstituteUser) => {
     const newStatus = !user.is_active;
     const actionLabel = newStatus ? "activate" : "deactivate";
+
+    if (!newStatus) {
+      const confirmed =
+        typeof window !== "undefined" && window.confirm
+          ? window.confirm(
+              `Are you sure you want to deactivate ${user.full_name}? They will not be able to log in to the portal.`
+            )
+          : true;
+      if (!confirmed) return;
+    }
 
     setTogglingUserId(user.id);
     try {
