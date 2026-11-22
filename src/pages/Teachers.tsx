@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Phone, Edit2, Trash2, CheckCircle2, Banknote, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  Phone,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  Banknote,
+  AlertTriangle,
+  KeyRound,
+  RefreshCw,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  Sparkles,
+} from "lucide-react";
 import { teachersService } from "../services/teachersService";
+import { userService } from "../services/userService";
+import { generateSecurePassword } from "../components/users/UserManagementTab";
+import { CredentialsModal, type CredentialsInfo } from "../components/users/CredentialsModal";
 import {
   Button,
   Modal,
@@ -14,13 +32,17 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import type { Teacher, TeacherSalaryConfigData } from "../types";
 
-export const Teachers: React.FC = () => {
+export interface TeachersProps {
+  initialShowModal?: boolean;
+}
+
+export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) => {
   const { role } = useAuth();
   const canManage = role === "owner" || role === "admin" || role === "super_admin";
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(initialShowModal);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
@@ -32,10 +54,18 @@ export const Teachers: React.FC = () => {
   const [fullName, setFullName] = useState("");
   const [subject, setSubject] = useState("Physics");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [calcType, setCalcType] = useState<"monthly_fixed" | "per_lecture" | "hourly">("monthly_fixed");
   const [baseAmount, setBaseAmount] = useState<number | string>(45000);
   const [perLectureRate, setPerLectureRate] = useState<number | string>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Portal Account Provisioning states
+  const [generateLogin, setGenerateLogin] = useState(true);
+  const [tempPassword, setTempPassword] = useState(() => generateSecurePassword(10));
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<CredentialsInfo | null>(null);
 
   useEffect(() => {
     loadData();
@@ -53,9 +83,52 @@ export const Teachers: React.FC = () => {
     }
   };
 
+  const handleCopyPassword = async () => {
+    if (!tempPassword) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(tempPassword);
+      }
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const resetAddForm = () => {
+    setFullName("");
+    setEmail("");
+    setPhone("");
+    setSubject("Physics");
+    setCalcType("monthly_fixed");
+    setBaseAmount(45000);
+    setPerLectureRate(0);
+    setGenerateLogin(true);
+    setTempPassword(generateSecurePassword(10));
+    setShowPasswordText(false);
+    setCopiedPassword(false);
+  };
+
+  const openAddModal = () => {
+    resetAddForm();
+    setShowModal(true);
+  };
+
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) return;
+
+    if (generateLogin) {
+      if (!email.trim()) {
+        setErrorNotice("Email address is required to generate a faculty portal login account.");
+        return;
+      }
+      if (!tempPassword || tempPassword.length < 6) {
+        setErrorNotice("Temporary password must be at least 6 characters long.");
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     setErrorNotice(null);
@@ -74,20 +147,56 @@ export const Teachers: React.FC = () => {
       is_active: true,
       salary_config,
     });
-    setIsSubmitting(false);
 
     if (res.error || !res.data) {
+      setIsSubmitting(false);
       setErrorNotice(res.error || "Failed to save teacher record.");
       return;
     }
 
-    setShowModal(false);
-    setFullName("");
-    setPhone("");
-    setBaseAmount(45000);
-    setPerLectureRate(0);
-    setNotice(`Faculty ${res.data.full_name} registered successfully with salary structure.`);
-    loadData();
+    const createdTeacher = res.data;
+
+    if (generateLogin) {
+      const userRes = await userService.createInstituteUser({
+        full_name: createdTeacher.full_name,
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        password: tempPassword,
+        role: "teacher",
+        teacher_id: createdTeacher.id,
+      });
+
+      setIsSubmitting(false);
+
+      if (userRes.error || !userRes.data) {
+        setErrorNotice(
+          `Faculty ${createdTeacher.full_name} registered, but creating portal login failed: ${userRes.error || "Unknown error"}. You can provision credentials manually from Settings > User Accounts.`
+        );
+        setShowModal(false);
+        resetAddForm();
+        loadData();
+        return;
+      }
+
+      setShowModal(false);
+      resetAddForm();
+      setCreatedCredentials({
+        name: createdTeacher.full_name,
+        username: userRes.data.email || email.trim(),
+        password: tempPassword,
+        phone: phone.trim() || undefined,
+        role: "teacher",
+        isReset: false,
+      });
+      setNotice(`Faculty ${createdTeacher.full_name} registered successfully with portal access.`);
+      loadData();
+    } else {
+      setIsSubmitting(false);
+      setShowModal(false);
+      resetAddForm();
+      setNotice(`Faculty ${createdTeacher.full_name} registered successfully with salary structure.`);
+      loadData();
+    }
   };
 
   const openEdit = (t: Teacher) => {
@@ -186,15 +295,7 @@ export const Teachers: React.FC = () => {
         {canManage && (
           <Button
             variant="primary"
-            onClick={() => {
-              setFullName("");
-              setPhone("");
-              setSubject("Physics");
-              setCalcType("monthly_fixed");
-              setBaseAmount(45000);
-              setPerLectureRate(0);
-              setShowModal(true);
-            }}
+            onClick={openAddModal}
             icon={<Plus size={16} />}
           >
             Add teacher
@@ -217,7 +318,7 @@ export const Teachers: React.FC = () => {
             title="No faculty members recorded"
             description="Add your first teacher to assign subjects and batches for attendance tracking."
             actionLabel={canManage ? "Add teacher" : undefined}
-            onAction={canManage ? () => setShowModal(true) : undefined}
+            onAction={canManage ? openAddModal : undefined}
           />
         ) : (
           <div className="teacher-grid">
@@ -343,6 +444,109 @@ export const Teachers: React.FC = () => {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+91 98765 43210"
           />
+
+          <Input
+            label={`Email Address ${generateLogin ? "*" : "(Optional)"}`}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="e.g. rajesh.sharma@pradeepclasses.in"
+            required={generateLogin}
+          />
+
+          {/* Portal Access & Login Account */}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="p-3.5 bg-sky-50/60 rounded-xl border border-sky-100 space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={generateLogin}
+                  onChange={(e) => setGenerateLogin(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#16466f] focus:ring-[#16466f]"
+                />
+                <div>
+                  <span className="text-xs font-bold text-[#1c3045] flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-[#16466f]" />
+                    Generate Faculty Portal Login Account
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Creates active portal credentials so the faculty member can manage batches, assignments, and attendance.
+                  </span>
+                </div>
+              </label>
+
+              {generateLogin && (
+                <div className="space-y-2 pt-2 border-t border-sky-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Temporary Password *
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Min 6 characters
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showPasswordText ? "text" : "password"}
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
+                        placeholder="Temporary password"
+                        className="font-mono text-xs pr-10"
+                        required={generateLogin}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordText(!showPasswordText)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title={showPasswordText ? "Hide password" : "Show password"}
+                      >
+                        {showPasswordText ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setTempPassword(generateSecurePassword(10))}
+                      icon={<RefreshCw size={13} />}
+                      title="Generate new password"
+                    >
+                      Generate
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyPassword}
+                      className="h-10 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                      title="Copy temporary password"
+                    >
+                      {copiedPassword ? (
+                        <>
+                          <Check size={14} className="text-emerald-600" />
+                          <span className="text-emerald-700">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} className="text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-amber-700 flex items-center gap-1.5 pt-1">
+                    <Sparkles size={13} className="text-amber-500 shrink-0" />
+                    <span>
+                      Email is required for faculty portal access. The faculty member will log in with their email address.
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="pt-2 border-t border-slate-100 space-y-3">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
@@ -535,6 +739,16 @@ export const Teachers: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Credentials Summary & WhatsApp Dispatch */}
+      <CredentialsModal
+        isOpen={Boolean(createdCredentials)}
+        onClose={() => setCreatedCredentials(null)}
+        credentials={createdCredentials}
+        whatsAppButtonLabel="Send Faculty Portal Access via WhatsApp"
+        title="Faculty Portal Account Provisioned"
+        subtitle="FACULTY CREDENTIAL DISPATCH"
+      />
     </div>
   );
 };

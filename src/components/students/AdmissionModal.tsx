@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from "react";
+import {
+  KeyRound,
+  RefreshCw,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  Sparkles,
+} from "lucide-react";
 import { Modal, Input, Select, Button } from "../common";
 import { studentsService, type LiveBatchOption } from "../../services/studentsService";
+import { userService } from "../../services/userService";
+import { generateSecurePassword } from "../users/UserManagementTab";
+import { CredentialsModal, type CredentialsInfo } from "../users/CredentialsModal";
 import type { Student } from "../../types";
 
 interface AdmissionModalProps {
@@ -40,12 +52,20 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
   const [emergencyContact, setEmergencyContact] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Portal Access Login Account
+  const [generateLogin, setGenerateLogin] = useState(true);
+  const [tempPassword, setTempPassword] = useState(() => generateSecurePassword(10));
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<CredentialsInfo | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       loadBatches();
+      setTempPassword(generateSecurePassword(10));
     }
   }, [isOpen]);
 
@@ -58,6 +78,19 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
       setSelectedBatchId(firstAvailable.id);
     }
     setLoadingBatches(false);
+  };
+
+  const handleCopyPassword = async () => {
+    if (!tempPassword) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(tempPassword);
+      }
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    } catch {
+      // Fallback
+    }
   };
 
   const resetForm = () => {
@@ -75,6 +108,10 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
     setParentEmail("");
     setEmergencyContact("");
     setNotes("");
+    setGenerateLogin(true);
+    setTempPassword(generateSecurePassword(10));
+    setShowPassword(false);
+    setCopiedPassword(false);
     setError(null);
   };
 
@@ -86,6 +123,10 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
     }
     if (!phone.trim()) {
       setError("Student contact phone is required.");
+      return;
+    }
+    if (generateLogin && (!tempPassword || tempPassword.length < 6)) {
+      setError("Portal temporary password must be at least 6 characters long.");
       return;
     }
 
@@ -113,25 +154,66 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
       notes: notes.trim() || undefined,
     });
 
-    setIsSubmitting(false);
-
     if (res.error || !res.data) {
+      setIsSubmitting(false);
       setError(res.error || "Failed to create student admission record.");
       return;
     }
 
-    onSuccess(res.data);
-    resetForm();
-    onClose();
+    const createdStudent = res.data;
+
+    if (generateLogin) {
+      const userRes = await userService.createInstituteUser({
+        full_name: createdStudent.full_name,
+        email: createdStudent.email || undefined,
+        phone: createdStudent.phone || parentPhone.trim() || undefined,
+        password: tempPassword,
+        role: "student",
+        student_id: createdStudent.id,
+      });
+
+      setIsSubmitting(false);
+
+      if (userRes.error || !userRes.data) {
+        // Enrolled student successfully, but portal user creation returned error
+        setError(
+          `Student enrolled with Admission ID ${createdStudent.admission_no}, but creating portal login failed: ${userRes.error || "Unknown error"}. You can provision credentials manually from Settings > User Accounts.`
+        );
+        onSuccess(createdStudent);
+        return;
+      }
+
+      // Notify parent page of the newly enrolled student
+      onSuccess(createdStudent);
+
+      // Present clean Credentials modal
+      setCreatedCredentials({
+        name: createdStudent.full_name,
+        username:
+          userRes.data.email ||
+          (createdStudent.email ||
+            `${createdStudent.admission_no.toLowerCase()}@pradeepclasses.in`),
+        password: tempPassword,
+        phone: createdStudent.phone || parentPhone.trim() || undefined,
+        role: "student",
+        isReset: false,
+      });
+    } else {
+      setIsSubmitting(false);
+      onSuccess(createdStudent);
+      resetForm();
+      onClose();
+    }
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Student Admission & Registration"
-      subtitle="NEW STUDENT ENROLLMENT"
-    >
+    <>
+      <Modal
+        isOpen={isOpen && !createdCredentials}
+        onClose={onClose}
+        title="Student Admission & Registration"
+        subtitle="NEW STUDENT ENROLLMENT"
+      >
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 text-xs text-red-700 rounded-lg">
@@ -329,6 +411,110 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
           </div>
         </div>
 
+        {/* Section 4: Student Portal Login Account */}
+        <div className="pt-3 border-t border-slate-100">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-[#16466f] text-white flex items-center justify-center text-[10px]">
+              4
+            </span>
+            Portal Access & Login Account
+          </h4>
+
+          <div className="p-3.5 bg-sky-50/60 rounded-xl border border-sky-100 space-y-3">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                id="generate-student-login-toggle"
+                type="checkbox"
+                checked={generateLogin}
+                onChange={(e) => setGenerateLogin(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#16466f] focus:ring-[#16466f]"
+              />
+              <div>
+                <span className="text-xs font-bold text-[#1c3045] flex items-center gap-1.5">
+                  <KeyRound size={14} className="text-[#16466f]" />
+                  Generate Student Portal Login Account
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">
+                  Creates active portal credentials so the student can access notes, tests, and homework immediately.
+                </span>
+              </div>
+            </label>
+
+            {generateLogin && (
+              <div className="space-y-2 pt-2 border-t border-sky-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Temporary Password *
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Min 6 characters
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={tempPassword}
+                      onChange={(e) => setTempPassword(e.target.value)}
+                      placeholder="Temporary password"
+                      className="font-mono text-xs pr-10"
+                      required={generateLogin}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setTempPassword(generateSecurePassword(10))}
+                    icon={<RefreshCw size={13} />}
+                    title="Generate new random password"
+                  >
+                    Generate
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyPassword}
+                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Copy temporary password"
+                  >
+                    {copiedPassword ? (
+                      <>
+                        <Check size={14} className="text-emerald-600" />
+                        <span className="text-emerald-700">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} className="text-slate-500" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-600 flex items-center gap-1.5 pt-1">
+                  <Sparkles size={13} className="text-amber-500 shrink-0" />
+                  <span>
+                    {email.trim()
+                      ? `Student username will be ${email.trim()}`
+                      : "If student email is omitted, username defaults to {admission_no}@pradeepclasses.in."}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
@@ -340,5 +526,19 @@ export const AdmissionModal: React.FC<AdmissionModalProps> = ({
         </div>
       </form>
     </Modal>
+
+    <CredentialsModal
+      isOpen={Boolean(createdCredentials)}
+      onClose={() => {
+        setCreatedCredentials(null);
+        resetForm();
+        onClose();
+      }}
+      credentials={createdCredentials}
+      whatsAppButtonLabel="Send Welcome WhatsApp"
+      title="Student Portal Login Provisioned"
+      subtitle="STUDENT CREDENTIAL DISPATCH"
+    />
+    </>
   );
 };

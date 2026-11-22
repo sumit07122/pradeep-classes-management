@@ -42,6 +42,7 @@ export interface Teacher {
   full_name: string;
   subject: string;
   phone: string;
+  email?: string;
   assigned_batches: string[];
   is_active?: boolean;
   institute_id?: string;
