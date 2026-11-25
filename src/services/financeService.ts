@@ -352,25 +352,74 @@ export async function deleteExpense(id: string): Promise<void> {
  */
 export async function getTeacherSalaryConfigs(): Promise<TeacherSalaryConfig[]> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  const { data: configs, error: cfgError } = await supabase
     .from("teacher_salary_configs")
     .select(`
       *,
       teachers (
-        full_name
+        id,
+        full_name,
+        subject
       )
     `)
     .eq("institute_id", INSTITUTE_ID);
 
-  if (error) {
-    console.error("Error fetching teacher salary configs:", error);
-    throw error;
+  if (cfgError) {
+    console.error("Error fetching teacher salary configs:", cfgError);
+    throw cfgError;
   }
 
-  return (data || []).map((row: any) => ({
-    ...row,
-    teacher_name: row.teachers?.full_name || "Faculty Member",
-  }));
+  // Also query active faculty to surface unconfigured teachers
+  const { data: teachers, error: tError } = await supabase
+    .from("teachers")
+    .select("id, full_name, subject, is_active")
+    .order("full_name");
+
+  if (tError || !teachers || teachers.length === 0) {
+    return (configs || []).map((row: any) => ({
+      ...row,
+      teacher_name: row.teachers?.full_name || "Faculty Member",
+    }));
+  }
+
+  const existingMap = new Map<string, any>();
+  (configs || []).forEach((c: any) => {
+    existingMap.set(c.teacher_id, c);
+  });
+
+  const merged: TeacherSalaryConfig[] = [];
+  teachers.forEach((t: any) => {
+    const existing = existingMap.get(t.id);
+    if (existing) {
+      merged.push({
+        ...existing,
+        teacher_name: t.full_name || existing.teachers?.full_name || "Faculty Member",
+      });
+      existingMap.delete(t.id);
+    } else {
+      merged.push({
+        id: `unconfigured-${t.id}`,
+        institute_id: INSTITUTE_ID,
+        teacher_id: t.id,
+        calculation_type: "monthly_fixed",
+        base_amount: 0,
+        per_lecture_rate: 0,
+        teacher_name: t.full_name || "Faculty Member",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Append any existing configs not matched
+  existingMap.forEach((c: any) => {
+    merged.push({
+      ...c,
+      teacher_name: c.teachers?.full_name || "Faculty Member",
+    });
+  });
+
+  return merged;
 }
 
 /**

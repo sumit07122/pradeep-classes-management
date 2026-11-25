@@ -97,7 +97,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ className = 
                 <div>
                   <h3
                     id="pwa-install-title"
-                    className="text-base font-extrabold text-slate-900 font-serif"
+                    className="text-base font-extrabold text-slate-900 font-sans tracking-tight"
                   >
                     Install Pradeep Classes
                   </h3>

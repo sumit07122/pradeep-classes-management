@@ -58,11 +58,11 @@ export const SalaryConfigModal: React.FC<SalaryConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 font-['Inter']">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 font-sans">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
         <div className="px-6 py-4 bg-[#102f50] text-white flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold font-['Manrope']">Configure Faculty Compensation</h3>
+            <h3 className="text-sm font-bold font-display">Configure Faculty Compensation</h3>
             <p className="text-[11px] text-slate-300">{config.teacher_name}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10">
