@@ -368,11 +368,11 @@ BEGIN
                 v_inst_id,
                 v_config.teacher_id,
                 p_month,
-                v_config.base_salary,
+                COALESCE(v_config.base_amount, 0),
                 0,
                 0,
                 0,
-                v_config.base_salary,
+                COALESCE(v_config.base_amount, 0),
                 'pending'
             );
             v_count := v_count + 1;
