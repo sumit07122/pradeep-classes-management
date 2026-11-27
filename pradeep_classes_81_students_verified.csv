@@ -1,0 +1,82 @@
+admission_no,full_name,class_name,assigned_batch,school_name,gender,date_of_birth,phone,parent_name,parent_phone,parent_occupation,address,city,registration_date,verification_status
+PC-2025-0001,Aarohi Singh,Ist Year,Junior Foundation (Classes 1st–3rd),Seth M.R. Jaipuria,Female,2019-12-06,7535960853,Mr. Bhupendra Kumar,8057232496,Govt Employee (Service),24 C Phase third Narsi Vihar City near Sonkh Road Mandi Chauraha Mathura,Mathura,2024-10-03,VERIFIED
+PC-2025-0002,Varun Agrawal,7th F,Middle School Entrance Prep (6th–8th),K.M.P.S (Main branch),Male,2015-09-29,9686507573,M.R. Mahaveer Agrawal,9686507573,Business,Narsi Vihar city (House - 95),Mathura,2024-10-07,VERIFIED
+PC-2025-0003,Ayansh Kumar,IIIrd Year,Junior Foundation (Classes 1st–3rd),Seth M.R. Jaipuria,Male,2018-06-06,7535960853,Mr. Bhupendra Kumar,8057232496,Govt Service,24 C Phase third Narsi Vihar City near Sonkh Road Mandi Chauraha Mathura,Mathura,2024-10-03,VERIFIED
+PC-2025-0004,Vedh,5th,Primary Entrance Prep (Classes 4th–5th),Baba Pati Ram,Male,2015-10-28,9634431695,Ajay Kumar,9762756234,Private Job,"Nagla Bhojpur Goan, Satoha link road",Mathura,2024-10-06,VERIFIED
+PC-2025-0005,Kalash,4th,Primary Entrance Prep (Classes 4th–5th),Ramlal Shiromani,Male,2015-10-31,8077928366,Mr. Rajendra Singh,8077928366,Private Job,Chaubey Lok Colony,Mathura,2024-10-01,VERIFIED
+PC-2025-0006,Tarun Agrawal,9th A,Secondary Board Prep (9th–10th),K.M.P.S (main branch),Male,2013-03-30,9286507573,Mr. Mahaveer Agrawal,9286507573,Business,Narsi vihar Phase-1 (95 House),Mathura,2024-10-07,VERIFIED
+PC-2025-0007,Bhavya Rawat,V,Primary Foundation (Classes 4th–5th),RLPKD,Female,2015-12-12,7036187650,Vishvendra Singh,9573819430,Government Employee,"418, Narsi Vihar",Mathura,2024-10-10,VERIFIED
+PC-2025-0008,Harish Agrawal,5th,Primary Foundation (Classes 4th–5th),Ramanlal Shorawala Public School maholi road,Male,2016-07-06,8532939415,Rahul Agrawal,8218920208,Business,A-13 Baldevpuri maholi road,Mathura,2024-10-10,VERIFIED
+PC-2025-0009,Shauryans Chaudhary,1st,Junior Foundation (Classes 1st–3rd),Grace convent school,Male,2021-01-13,7001722204,Sutej Pal Singh Chaudhary,9027566242,Engineer (Software),House no - 130 Narsi vihar,Mathura,2024-10-08,VERIFIED
+PC-2025-0010,Ayush Singh,IVth,Primary Entrance Prep (Classes 4th–5th),JVG,Male,2017-09-12,9411910590,Mr. Bhopal Singh,9528374987,Army,185 C-Block Narsi vihar city,Mathura,2024-10-10,VERIFIED
+PC-2025-0011,Divya Agrawal,7th,Middle School Foundation (6th–8th),Sanskar Public school,Female,2015-01-25,8445509728,Gyanendra Agrawal,8445509728,Business,382 Home No Phase 1 Narsi Vihar Sonkh Road,Mathura,2024-10-20,VERIFIED
+PC-2025-0012,Ruhi Agrawal,IIIrd,Junior Foundation (Classes 1st–3rd),Sanskar Public school,Female,2017-07-30,8445509728,Gyanendra Agrawal,8445509728,Business,382 Home No. Phase 1 Narsi Vihar Sonkh Road,Mathura,2024-10-20,VERIFIED
+PC-2025-0013,Bhupendra Singh,IXth,Secondary Board Prep (9th–10th),MPSM,Male,2012-01-01,8936968884,Mr. Pradeep Kumar,9389222388,Shopkeeper (Gen. Store),Nangao Sonkh Road,Mathura,2024-11-24,VERIFIED
+PC-2025-0014,Bhavesh Singh,4th,Primary Entrance Prep (Classes 4th–5th),Baba Pati Ram Vidhya Mandir,Male,2016-04-28,9760946505,Vinod Kumar,7078863426,Private Job,"Samuk Tela, Narsi Vihar ke peeche",Mathura,2024-11-19,VERIFIED
+PC-2025-0015,Diya,6th,Middle School Entrance Prep (6th–8th),SJB (Girls),Female,2015-01-01,9897000001,Mr. Manoj Sharma,9897000001,Farmer,"Maharaja Vaishali, Sonkh Road",Mathura,2024-09-01,VERIFIED
+PC-2025-0016,Raja Singh,IXth,Secondary Board Prep (9th–10th),Symbiosis,Male,2012-11-13,8439771519,Mr. Prathvi Singh Kuntal,8279683960,Private Job,Dev Garden,Mathura,2024-11-16,VERIFIED
+PC-2025-0017,Kuldeep Singh,7th,Middle School Entrance Prep (6th–8th),Baba Pati Ram Vidya Mandir,Male,2013-10-24,9760946505,Vinod Kumar,7078863426,Private Job,"Samuk Tela, Narsi Vihar ke peeche",Mathura,2024-11-19,VERIFIED
+PC-2025-0018,Chesta Chaudhary,Xth,Secondary Board Prep (9th–10th),R.L.,Female,2010-11-19,9675371738,Mr. Lokvendra Singh,6397632392,Private Job,"Transport Nagar, Near BSNL Tower",Mathura,2024-09-04,VERIFIED
+PC-2025-0019,Ayushi Kuntal,6th,Middle School Foundation (6th–8th),"St. Dominico's School, Baad",Female,2015-07-10,9761332000,Upendra Singh,9761813200,Government Teacher,Narsi Vihar Sonkh Road,Mathura,2024-10-20,VERIFIED
+PC-2025-0020,Renu,9th,Secondary Board Prep (9th–10th),Maa Bhagwati Vidhya Mandir,Female,2013-01-05,9634889024,Mr. Vijendra Singh,6398520678,Labour,Abhishek Puri Colony,Mathura,2024-10-14,VERIFIED
+PC-2025-0021,Rani,5th,Primary Entrance Prep (Classes 4th–5th),Shri Radhe Near Patiram temple Krishna Nagar,Female,2015-10-01,9639140304,Mr. Raju,9639140304,Shopkeeper,"Sukhdev Nagar (Head pump), Sonkh road",Mathura,2024-10-21,VERIFIED
+PC-2025-0022,Anaya Solanki,2nd,Junior Foundation (Classes 1st–3rd),,Female,2019-07-15,8923014129,Dinesh Chand,9068537840,Govt teacher,128 C-Block Narshi Vihar,Mathura,2024-08-08,VERIFIED
+PC-2025-0023,Pari Chaudhary,VIIth,Middle School Entrance Prep (6th–8th),Maa Durga Public School Palikheda,Female,2015-03-27,7983620424,Mr. Omveer Singh,9368207101,Van Driver (School),Baikunth Green Near Achar factory,Mathura,2024-09-15,VERIFIED
+PC-2025-0024,Lucky Chaudhary,10th,Secondary Board Prep (9th–10th),,Male,2011-08-09,7900470715,Santosh Kumar,7900470715,Farmer,"Nagla Jujhar, Murwar gonda road Iglas Aligarh",Aligarh,2024-08-17,VERIFIED
+PC-2025-0025,Muskan,VIIth,Middle School Entrance Prep (6th–8th),Baba Pati Ram,Female,2015-07-20,9917638226,Mr. Mahendra,9761122906,Carpenter,Abhishek Puri,Mathura,2024-09-24,VERIFIED
+PC-2025-0026,Inderjeet,VIIIth,Middle School Entrance Prep (6th–8th),Baba Pati Ram,Male,2012-07-08,9917638226,Mr. Mahendra,9761122906,Carpenter,Abhishek Puri Colony,Mathura,2024-09-24,VERIFIED
+PC-2025-0027,Rupanshi Chaudhary,U.K.G,Junior Foundation (Classes 1st–3rd),J.V.G International School,Female,2020-05-06,8126021442,Devendra Singh,9457333079,Business,Chaitanya Lok colony near narsi vihar Sonkh road,Mathura,2024-09-18,VERIFIED
+PC-2025-0028,Nakul,Ist,Junior Foundation (Classes 1st–3rd),Babapati Ram,Male,2016-08-04,9917638226,Mr. Mahendra,9761122906,Carpenter,Abhishek puri colony,Mathura,2024-09-24,VERIFIED
+PC-2025-0029,Ritika Chaudhary,3rd,Junior Foundation (Classes 1st–3rd),J.V.G International School,Female,2018-03-05,8126021442,Devendra Singh,9457333079,Business,Chaitanya Lok colony near narsi vihar Sonkh Road,Mathura,2024-09-18,VERIFIED
+PC-2025-0030,Shivani,IVth,Primary Entrance Prep (Classes 4th–5th),Babapati Ram,Female,2016-01-01,9917638226,Mr. Mahendra,9761122906,Carpenter,Abhishek puri colony,Mathura,2024-09-24,VERIFIED
+PC-2025-0031,Ayaan Chaudhary,2nd,Junior Foundation (Classes 1st–3rd),,Male,2018-01-01,9634145726,Shekhary Chaudhary,9957668949,Building Materials,Transport Nagar,Mathura,2024-07-28,VERIFIED
+PC-2025-0032,Anshul,7th,Middle School Foundation (6th–8th),,Male,2013-04-03,7505079567,Bal Krishan Sharma,7351616617,Farmer,"Chaitanya Lok, Narsi vihar Mandi chauraha",Mathura,2024-07-28,VERIFIED
+PC-2025-0033,Suryansh Bhardwaj,6th,Middle School Foundation (6th–8th),Shree-Ji Baba,Male,2015-10-31,9758400045,Mr. Krishn Kumar,7017046434,Private Sector,14-A Gopal Dham Sonkh Road,Mathura,2024-09-06,VERIFIED
+PC-2025-0034,Jaya Kumari,11th,Senior Secondary (11th–12th),,Female,2010-01-15,7906930016,Mr. Gajendra Singh,9997621579,Farmer,"Maharaja Greens, Sonkh Road",Mathura,2024-07-28,VERIFIED
+PC-2025-0035,Khushi Gola,8th,Middle School Foundation (6th–8th),,Female,2012-12-17,6397766880,Mr. Kishan Kumar,9389340795,Dhaba,R.K Puram colony,Mathura,2024-07-28,VERIFIED
+PC-2025-0036,Aditya Chaudhary,3rd,Junior Foundation (Classes 1st–3rd),,Male,2013-08-16,9634145726,Shekhary Chaudhary,9997668949,Building Materials,13-C Transport Nagar,Mathura,2024-07-27,VERIFIED
+PC-2025-0037,Arav,5th,Primary Entrance Prep (Classes 4th–5th),,Male,2014-02-13,8865808815,Akash Kusum,8865808815,Businessman,Shankar Puram colony Surya Nagar Sonkh Road,Mathura,2024-07-27,VERIFIED
+PC-2025-0038,Kartik,6th,Middle School Foundation (6th–8th),,Male,2014-07-23,9760852154,Mr. Govind Prasad,9760852154,Private Job,Chaitanya Lok Colony,Mathura,2024-07-27,VERIFIED
+PC-2025-0039,Nirbhay Pandey,7th,Middle School Foundation (6th–8th),,Male,2014-10-09,7404895747,Prahalad Pandey,9719442794,Private Job,"H.No -> 215, Narsi Vihar, Sonkh Road",Mathura,2024-07-27,VERIFIED
+PC-2025-0040,Gaurav Chaudhary,VI,Middle School Entrance Prep (6th–8th),,Male,2014-08-11,7817847049,Sushil Kumar,7817847049,Advocate,Gopal dham Phase-3,Mathura,2024-07-27,VERIFIED
+PC-2025-0041,Granth Agrawal,5th,Primary Foundation (Classes 4th–5th),,Male,2016-10-04,9897695910,Naveen Agrawal,8630300216,Food Vendor,Mahaveer Nagar Bhuteshwar,Mathura,2024-07-27,VERIFIED
+PC-2025-0042,Divya,4th,Primary Foundation (Classes 4th–5th),,Female,2017-01-01,7017451540,Dharmdas,7017451540,Mistri,Abhishek Puri Colony,Mathura,2024-07-27,VERIFIED
+PC-2025-0043,Aman,6th,Middle School Entrance Prep (6th–8th),,Male,2014-09-13,9928407768,Mr. Bankey Bihari,6378836974,Scaffolding / Centering,Narsi Vihar phase 2 House No. 5,Mathura,2024-07-27,VERIFIED
+PC-2025-0044,Edwin,8th,Middle School Entrance Prep (6th–8th),,Male,2012-08-07,9927831749,Mr. Pramod Kumar,9058076549,Basic Education,Vikas Nagar,Mathura,2024-07-28,VERIFIED
+PC-2025-0045,Pallavi Chaudhary,7th,Middle School Foundation (6th–8th),,Female,2017-01-01,7668264186,Mr. Sanjay,9412120359,Doctor,Abhishek puri colony,Mathura,2024-07-27,VERIFIED
+PC-2025-0046,Tejas Kumar Sharma,IXth,Secondary Board Prep (9th–10th),,Male,2012-02-14,9258272380,Mr. Naresh Sharma,9557751380,Govt Servant (MES),"114, LIG, Radhika Vihar-1st Sonkh road",Mathura,2024-07-25,VERIFIED
+PC-2025-0047,Navya Chaudhary,9th,Secondary Board Prep (9th–10th),,Female,2012-05-15,9084329380,Mr. Shiv Kumar Singh,9084329380,Bank Employee (Axis Bank),Hansraj nagar colony,Mathura,2024-08-31,VERIFIED
+PC-2025-0048,Tanishka Sharma,Vth,Primary Entrance Prep (Classes 4th–5th),,Female,2016-08-06,7500108090,Mr. Rajeev Sharma,7078166555,Business man,Vijay nagar maholi Nagar,Mathura,2024-08-03,VERIFIED
+PC-2025-0049,Ananya,10,Secondary Board Prep (9th–10th),,Female,2011-11-21,9808936960,Bhanu Singh,8979862652,Doctor,Krishna Nagar,Mathura,2024-08-03,VERIFIED
+PC-2025-0050,Mayank,5th,Primary Entrance Prep (Classes 4th–5th),,Male,2015-01-01,8923655584,Harpal,8923655584,Bank manager,R.K Puram 1st,Mathura,2024-07-17,VERIFIED
+PC-2025-0051,Abhiraj Singh,7th,Middle School Entrance Prep (6th–8th),,Male,2014-11-23,8923214214,Sh. Satyepal Singh,8218490042,Private Job,"78, Ram Krishna Nagar Goverdhan Road Opp. Gyan Deep School",Mathura,2024-08-02,VERIFIED
+PC-2025-0052,Kartik,1st,Junior Foundation (Classes 1st–3rd),,Male,2019-01-19,9756350951,Mr. Munesh,9756350951,Driver,Mandi Chauraha,Mathura,2024-04-15,VERIFIED
+PC-2025-0053,Tanmay,1st,Junior Foundation (Classes 1st–3rd),,Male,2019-01-01,9897000002,Mr. Abhishek,9897000002,Army Soldier,Narsi Vihar,Mathura,2024-05-04,VERIFIED
+PC-2025-0054,Dhruv,6th,Middle School Entrance Prep (6th–8th),,Male,2014-11-08,9760381917,Kartar Singh,8171065271,Electrician,Krishna Vihar Colony Sonkh Road,Mathura,2024-04-21,VERIFIED
+PC-2025-0055,Siddarth Chaudhary,8th,Middle School Entrance Prep (6th–8th),,Male,2012-10-12,9648679046,Mr. Jitendra Singh,9451143011,Police Man,Pali Kheda Satoha Road Bhaikunth Garden Colony,Mathura,2024-04-22,VERIFIED
+PC-2025-0056,Chirag,VI B,Middle School Foundation (6th–8th),,Male,2014-08-15,9827961854,Manoj Kumar Rana,9627961854,Bank manager,Narsi Vihar,Mathura,2024-03-31,VERIFIED
+PC-2025-0057,Atul Chaudhary,8th,Middle School Entrance Prep (6th–8th),,Male,2011-09-18,8755295373,Sh. Mr. Satyaveer Singh,7351533231,Farmer,Chaitanya Lok Colony,Mathura,2024-04-21,VERIFIED
+PC-2025-0058,Ayush Singh,6th Bhabha,Middle School Foundation (6th–8th),,Male,2015-01-01,9758771717,Abhishek Kumar,9045107712,Army,Narsi Vihar city Phase 1 -> 400,Mathura,2024-05-04,VERIFIED
+PC-2025-0059,Ujjwal Gupta,IXth A,Secondary Board Prep (9th–10th),,Male,2012-01-25,9497933288,Gajendra Kumar,9027372498,Business,"Narsi Vihar, D-1, D-2",Mathura,2024-04-26,VERIFIED
+PC-2025-0060,Jay Singhal,IX,Secondary Board Prep (9th–10th),,Male,2011-11-20,9410040426,Mr. Mukesh Singhal,7500340426,Business,"Narsi Vihar Sonkh Road, House No. 94",Mathura,2024-04-10,VERIFIED
+PC-2025-0061,Atharv Shukla,9th,Secondary Board Prep (9th–10th),,Male,2013-08-29,6397552303,Ajay Kumar Shukla,9956161694,Government Job,Behind Sant Paulse phase 1,Mathura,2024-04-13,VERIFIED
+PC-2025-0062,Vaishnavi Sahu,9th,Secondary Board Prep (9th–10th),,Female,2011-12-11,9528369302,Mr. Gopal Krishna Sahu,9997880224,Self Business,Narsi Vihar City Phase - I H.No - 488,Mathura,2024-04-13,VERIFIED
+PC-2025-0063,Aarav,VII A,Middle School Entrance Prep (6th–8th),,Male,2013-12-17,9760738853,Anil Kumar,9548878404,Army,"Narsi Vihar Colony, Sonkh Road",Mathura,2024-04-08,VERIFIED
+PC-2025-0064,Aarav Chaudhary,8th,Middle School Foundation (6th–8th),,Male,2012-09-22,6395670854,Rinkesh Kumar,6395670854,Supervisor,Narsi Vihar Colony Sonkh Road,Mathura,2024-04-09,VERIFIED
+PC-2025-0065,Kunal Agrawal,9th,Secondary Board Prep (9th–10th),,Male,2012-04-17,8077838210,Praveen Kumar,6395525882,Business (Mawa),Padam Puri Sonkh Road,Mathura,2024-04-11,VERIFIED
+PC-2025-0066,Harish Sharma,8th,Middle School Entrance Prep (6th–8th),,Male,2012-12-31,7017509650,Mr. Krishna Kumar,6397906760,Road lines (Transport),"Mahendra Nagar, Shri Krishna Misthan Bhandar ke samne gali",Mathura,2024-04-16,VERIFIED
+PC-2025-0067,Ankit,10th,Secondary Board Prep (9th–10th),,Male,2008-08-27,9536667212,Mr. Dharmveer,7017572119,Automobile Service Centre,"03, Transport Nagar",Mathura,2024-07-01,VERIFIED
+PC-2025-0068,Ankush Chaudhary,9th,Secondary Board Prep (9th–10th),,Male,2012-12-01,7668493569,Durgesh Chaudhary,7409862527,Army,Narsi Vihar Sonkh Road,Mathura,2024-04-28,VERIFIED
+PC-2025-0069,Vaibhav Rajawat,10th,Secondary Board Prep (9th–10th),,Male,2010-08-06,9997454541,Mr. Surendra Rajawat,9997454541,Sales,Mahendra Nagar Mandi Chauraha,Mathura,2024-07-28,VERIFIED
+PC-2025-0070,Himakshi Sharma,3rd,Junior Foundation (Classes 1st–3rd),,Female,2018-10-22,9760261021,Mr. Amar Nath,9897280943,Business,H.No. 398 Narsi Vihar Sonkh Road,Mathura,2024-07-16,VERIFIED
+PC-2025-0071,Misty Yadav,Kg.,Junior Foundation (Classes 1st–3rd),,Female,2020-01-01,9897000003,Mr. Rajnesh,9897000003,,Mandi chauraha,Mathura,2024-04-15,VERIFIED
+PC-2025-0072,Sumit,IXth,Secondary Board Prep (9th–10th),,Male,2011-01-01,8218195434,Ritesh Kumar,8218195434,Police,"39, Vaikunth green Colony Pali Kheda",Mathura,2024-07-01,VERIFIED
+PC-2025-0073,Harsh Chaudhary,9th,Secondary Board Prep (9th–10th),,Male,2012-07-02,9568924344,Suresh Chandra,8279721939,Assistant Professor in B.S.A. Engg College,Pali Kheda Sonkh road,Mathura,2024-07-25,VERIFIED
+PC-2025-0074,Krishnangi Agrawal,10th,Secondary Board Prep (9th–10th),,Female,2011-03-03,9897695910,Naveen Kumar Agrawal,9897695910,Businessman,Mahaveer Nagar Bhuteshwar,Mathura,2024-07-28,VERIFIED
+PC-2025-0075,Shauryansh,7th,Middle School Entrance Prep (6th–8th),,Male,2014-10-16,9320128501,Mr. Satish,8979334059,Driver,Hansraj Colony,Mathura,2024-07-13,VERIFIED
+PC-2025-0076,Manish Kumar,8th,Middle School Entrance Prep (6th–8th),,Male,2013-01-01,9897000004,Mr. Pradeep Kumar,9897000004,,Narsi Vihar Sonkh Road,Mathura,2024-07-17,VERIFIED
+PC-2025-0077,Gauri Goyal,9th,Secondary Board Prep (9th–10th),,Female,2012-02-02,6395725216,Kapil Goyal,9837082964,Business,Narsi Vihar City,Mathura,2024-07-23,VERIFIED
+PC-2025-0078,Naitik Chaudhary,2nd,Junior Foundation (Classes 1st–3rd),S.H. School,Male,2018-03-08,9045858553,Mr. Deepak,9045858553,Nexa (Manager),R.K puram 1st (Sonkh road),Mathura,2024-09-25,VERIFIED
+PC-2025-0079,Kanav Chaudhary,8th,Middle School Foundation (6th–8th),Grace Convent Senior Secondary,Male,2012-03-31,9870928244,Omveer,9897884705,Driver,Durga Puri Radhika vihar Sokh road,Mathura,2024-09-30,VERIFIED
+PC-2025-0080,Abhishek Kumar,VII,Middle School Foundation (6th–8th),MPSM School Ganeshra MTR,Male,2014-01-01,9627789908,Rakesh Kumar,9627789908,Teacher,Abhishekpuri Colony,Mathura,2024-09-25,VERIFIED
+PC-2025-0081,Nitin,8th,Middle School Entrance Prep (6th–8th),,Male,2011-11-26,9759622755,Hoshiyar Singh,9719192755,Shop,Sonkh Road Mohan palace,Mathura,2024-03-21,VERIFIED
