@@ -20,6 +20,9 @@ export interface InstituteSettings {
   default_pass_percentage: number;
   fee_late_fine_daily: number;
   currency_symbol: string;
+  receipt_prefix?: string | null;
+  invoice_prefix?: string | null;
+  terms_and_conditions?: string | null;
   timezone: string;
   meta?: Record<string, any>;
   created_at: string;

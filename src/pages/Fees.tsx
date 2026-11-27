@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Download, RefreshCw, MessageSquare } from "lucide-react";
+import { Plus, Download, RefreshCw, MessageSquare, Layers, Users } from "lucide-react";
 import { Button, AlertNotice, LoadingSpinner, EmptyState } from "../components/common";
 import {
   FeeStatsSummary,
@@ -8,6 +8,8 @@ import {
   CreateInvoiceModal,
   PrintableReceiptModal,
   PaymentHistoryModal,
+  FeeStructuresModal,
+  BatchInvoiceModal,
 } from "../components/fees";
 import { WhatsAppNotificationModal, type NotificationTarget } from "../components/whatsapp/WhatsAppNotificationModal";
 import { feesService } from "../services/feesService";
@@ -16,7 +18,7 @@ import type { FeeRecord, FeeSummary, FeeStatus } from "../types/fees";
 
 export const Fees: React.FC = () => {
   const { role } = useAuth();
-  const canManageFees = role === "owner" || role === "admin";
+  const canManageFees = role === "owner" || role === "admin" || role === "super_admin" || (role as string) === "accountant";
 
   const [records, setRecords] = useState<FeeRecord[]>([]);
   const [summary, setSummary] = useState<FeeSummary>({
@@ -35,6 +37,8 @@ export const Fees: React.FC = () => {
 
   // Modal States
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [isFeeStructuresOpen, setIsFeeStructuresOpen] = useState(false);
+  const [isBatchInvoiceOpen, setIsBatchInvoiceOpen] = useState(false);
   const [collectRecord, setCollectRecord] = useState<FeeRecord | null>(null);
   const [historyRecord, setHistoryRecord] = useState<FeeRecord | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
@@ -209,13 +213,29 @@ export const Fees: React.FC = () => {
           )}
 
           {canManageFees && (
-            <Button
-              variant="primary"
-              onClick={() => setIsCreateInvoiceOpen(true)}
-              icon={<Plus size={16} />}
-            >
-              Issue Invoice
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsFeeStructuresOpen(true)}
+                icon={<Layers size={14} className="text-amber-600" />}
+              >
+                Fee Plans
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsBatchInvoiceOpen(true)}
+                icon={<Users size={14} className="text-blue-600" />}
+              >
+                Batch Invoicing
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateInvoiceOpen(true)}
+                icon={<Plus size={16} />}
+              >
+                Issue Invoice
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -282,6 +302,23 @@ export const Fees: React.FC = () => {
         isOpen={Boolean(activeReceipt)}
         onClose={() => setActiveReceipt(null)}
         receipt={activeReceipt}
+      />
+
+      <FeeStructuresModal
+        isOpen={isFeeStructuresOpen}
+        onClose={() => setIsFeeStructuresOpen(false)}
+        onStructuresUpdated={() => {
+          loadFeesData();
+        }}
+      />
+
+      <BatchInvoiceModal
+        isOpen={isBatchInvoiceOpen}
+        onClose={() => setIsBatchInvoiceOpen(false)}
+        onInvoicesGenerated={() => {
+          setNotice({ type: "success", message: "Batch fee invoices generated successfully." });
+          loadFeesData();
+        }}
       />
 
       {/* WhatsApp One-Click Fee Reminder Modal */}

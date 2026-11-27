@@ -1,4 +1,4 @@
-export type UserRole = "super_admin" | "owner" | "admin" | "teacher" | "student";
+export type UserRole = "super_admin" | "owner" | "admin" | "teacher" | "student" | "accountant";
 
 export interface UserProfile {
   id: string;
@@ -78,6 +78,21 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageHomework: true,
     canManageTimetable: true,
     canManageAnnouncements: true,
+    canViewReports: true,
+    canViewStudentPortal: false,
+  },
+  accountant: {
+    canManageInstitute: false,
+    canManageStudents: true,
+    canManageTeachers: false,
+    canManageBatches: false,
+    canManageAttendance: false,
+    canMarkAttendance: false,
+    canManageFees: true,
+    canManageExams: false,
+    canManageHomework: false,
+    canManageTimetable: false,
+    canManageAnnouncements: false,
     canViewReports: true,
     canViewStudentPortal: false,
   },

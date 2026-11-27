@@ -38,6 +38,9 @@ export const settingsService = {
         default_pass_percentage: Number(data.default_pass_percentage || data.attendance_threshold || 40),
         fee_late_fine_daily: Number(data.fee_late_fine_daily || 50),
         currency_symbol: data.currency_symbol || "₹",
+        receipt_prefix: data.receipt_prefix || "REC",
+        invoice_prefix: data.invoice_prefix || "INV",
+        terms_and_conditions: data.terms_and_conditions || "",
         timezone: data.timezone || "Asia/Kolkata",
         created_at: data.created_at,
         updated_at: data.updated_at,
@@ -83,6 +86,10 @@ export const settingsService = {
       if (updates.fee_late_fine_daily !== undefined) {
         payload.fee_late_fine_daily = updates.fee_late_fine_daily;
       }
+      if (updates.currency_symbol !== undefined) payload.currency_symbol = updates.currency_symbol;
+      if (updates.receipt_prefix !== undefined) payload.receipt_prefix = updates.receipt_prefix;
+      if (updates.invoice_prefix !== undefined) payload.invoice_prefix = updates.invoice_prefix;
+      if (updates.terms_and_conditions !== undefined) payload.terms_and_conditions = updates.terms_and_conditions;
 
       const { data, error } = await supabase
         .from("institute_settings")
@@ -111,6 +118,9 @@ export const settingsService = {
           default_pass_percentage: Number(data.default_pass_percentage || 40),
           fee_late_fine_daily: Number(data.fee_late_fine_daily || 50),
           currency_symbol: data.currency_symbol || "₹",
+          receipt_prefix: data.receipt_prefix || "REC",
+          invoice_prefix: data.invoice_prefix || "INV",
+          terms_and_conditions: data.terms_and_conditions || "",
           timezone: data.timezone || "Asia/Kolkata",
           created_at: data.created_at,
           updated_at: data.updated_at,

@@ -208,6 +208,173 @@ export const feesService = {
   },
 
   /**
+   * Create a new fee structure
+   */
+  async createFeeStructure(payload: {
+    course_name: string;
+    academic_year?: string;
+    total_fee: number;
+    description?: string;
+  }): Promise<{ data: FeeStructure | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: "Database service is not configured." };
+    }
+    try {
+      const { data, error } = await supabase
+        .from("fee_structures")
+        .insert({
+          course_name: payload.course_name.trim(),
+          academic_year: payload.academic_year || "2025-2026",
+          total_fee: Number(payload.total_fee) || 0,
+          description: payload.description?.trim() || null,
+          institute_id: "11111111-2222-3333-4444-555555555555",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return {
+        data: {
+          id: data.id,
+          course_name: data.course_name,
+          academic_year: data.academic_year,
+          total_fee: Number(data.total_fee),
+          description: data.description,
+          institute_id: data.institute_id,
+          created_at: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to create fee structure" };
+    }
+  },
+
+  /**
+   * Update an existing fee structure
+   */
+  async updateFeeStructure(
+    id: string,
+    updates: Partial<{ course_name: string; academic_year: string; total_fee: number; description: string }>
+  ): Promise<{ data: FeeStructure | null; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: "Database service is not configured." };
+    }
+    try {
+      const payload: any = {};
+      if (updates.course_name !== undefined) payload.course_name = updates.course_name.trim();
+      if (updates.academic_year !== undefined) payload.academic_year = updates.academic_year;
+      if (updates.total_fee !== undefined) payload.total_fee = Number(updates.total_fee);
+      if (updates.description !== undefined) payload.description = updates.description.trim() || null;
+
+      const { data, error } = await supabase
+        .from("fee_structures")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return {
+        data: {
+          id: data.id,
+          course_name: data.course_name,
+          academic_year: data.academic_year,
+          total_fee: Number(data.total_fee),
+          description: data.description,
+          institute_id: data.institute_id,
+          created_at: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return { data: null, error: err.message || "Failed to update fee structure" };
+    }
+  },
+
+  /**
+   * Delete a fee structure
+   */
+  async deleteFeeStructure(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database service is not configured." };
+    }
+    try {
+      const { error } = await supabase.from("fee_structures").delete().eq("id", id);
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete fee structure" };
+    }
+  },
+
+  /**
+   * Batch issue fee invoices for all active students in a batch
+   */
+  async batchIssueInvoices(payload: {
+    batch_id: string;
+    title: string;
+    due_date: string;
+    amount?: number;
+    fee_structure_id?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, count: 0, error: "Database service is not configured." };
+    }
+
+    try {
+      const { data: students, error: studErr } = await supabase
+        .from("students")
+        .select("id, full_name, batch_name, admission_no")
+        .eq("batch_id", payload.batch_id)
+        .eq("status", "active");
+
+      if (studErr) throw studErr;
+      if (!students || students.length === 0) {
+        return { success: false, count: 0, error: "No active students found in the selected batch." };
+      }
+
+      let billedAmount = payload.amount || 0;
+      if (!billedAmount && payload.fee_structure_id) {
+        const { data: fs } = await supabase
+          .from("fee_structures")
+          .select("total_fee")
+          .eq("id", payload.fee_structure_id)
+          .maybeSingle();
+        if (fs?.total_fee) billedAmount = Number(fs.total_fee);
+      }
+
+      if (billedAmount <= 0) {
+        return { success: false, count: 0, error: "Invalid fee amount. Must be greater than 0." };
+      }
+
+      const records = students.map((s) => ({
+        student_id: s.id,
+        title: payload.title.trim(),
+        fee_structure_id: payload.fee_structure_id || null,
+        amount: billedAmount,
+        paid_amount: 0,
+        discount_amount: 0,
+        status: "pending",
+        due_date: payload.due_date,
+        notes: payload.notes || `Batch invoice for ${s.batch_name}`,
+        institute_id: "11111111-2222-3333-4444-555555555555",
+      }));
+
+      // Insert in chunks of 25
+      const chunkSize = 25;
+      for (let i = 0; i < records.length; i += chunkSize) {
+        const chunk = records.slice(i, i + chunkSize);
+        const { error: insErr } = await supabase.from("fee_records").insert(chunk);
+        if (insErr) throw insErr;
+      }
+
+      return { success: true, count: records.length };
+    } catch (err: any) {
+      return { success: false, count: 0, error: err.message || "Failed to batch issue invoices" };
+    }
+  },
+
+  /**
    * Collect an atomic fee payment (full or partial)
    */
   async collectPayment(payload: CollectFeePayload): Promise<any> {

@@ -171,6 +171,10 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
       academic_year: instituteSettings.academic_year,
       default_pass_percentage: Number(instituteSettings.default_pass_percentage),
       fee_late_fine_daily: Number(instituteSettings.fee_late_fine_daily),
+      currency_symbol: instituteSettings.currency_symbol || "₹",
+      receipt_prefix: instituteSettings.receipt_prefix || "REC",
+      invoice_prefix: instituteSettings.invoice_prefix || "INV",
+      terms_and_conditions: instituteSettings.terms_and_conditions || "",
     });
 
     setIsSaving(false);
@@ -578,6 +582,40 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
                 type="number"
                 value={instituteSettings.fee_late_fine_daily}
                 onChange={(e) => setInstituteSettings({ ...instituteSettings, fee_late_fine_daily: Number(e.target.value) })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <Input
+                label="Receipt Prefix"
+                placeholder="e.g. REC or PC-REC-"
+                value={instituteSettings.receipt_prefix || ""}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, receipt_prefix: e.target.value })}
+              />
+              <Input
+                label="Invoice Prefix"
+                placeholder="e.g. INV or PC-INV-"
+                value={instituteSettings.invoice_prefix || ""}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, invoice_prefix: e.target.value })}
+              />
+              <Input
+                label="Currency Symbol"
+                placeholder="e.g. ₹"
+                value={instituteSettings.currency_symbol || "₹"}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, currency_symbol: e.target.value })}
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Receipt Terms & Conditions / Institute Notice
+              </label>
+              <textarea
+                rows={3}
+                className="w-full text-xs rounded-lg border border-slate-300 p-2.5 focus:border-[#16466f] focus:outline-none focus:ring-1 focus:ring-[#16466f]"
+                placeholder="e.g. Fees once paid are non-refundable. Minimum 75% attendance required."
+                value={instituteSettings.terms_and_conditions || ""}
+                onChange={(e) => setInstituteSettings({ ...instituteSettings, terms_and_conditions: e.target.value })}
               />
             </div>
           </div>

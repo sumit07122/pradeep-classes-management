@@ -546,6 +546,8 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
         return "info";
       case "teacher":
         return "warning";
+      case "accountant":
+        return "success";
       case "admin":
         return "violet";
       case "owner":
@@ -916,6 +918,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
             >
               <option value="student">Student (Portal Access)</option>
               <option value="teacher">Teacher (Faculty Portal & Diary)</option>
+              <option value="accountant">Accountant (Fees, Accounts & Ledger)</option>
               <option value="admin">Admin (Branch Administrator)</option>
               <option value="owner">Owner (Full Management)</option>
             </select>
