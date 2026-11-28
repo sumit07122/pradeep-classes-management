@@ -13,6 +13,7 @@ import { AttendanceStats, RollCallTable, AttendanceDefaultersModal } from "../co
 import { WhatsAppNotificationModal, type NotificationTarget } from "../components/whatsapp/WhatsAppNotificationModal";
 import { batchesService } from "../services/batchesService";
 import { attendanceService } from "../services/attendanceService";
+import { whatsappAutomationService } from "../services/whatsappAutomationService";
 import { useAuth } from "../hooks/useAuth";
 import type {
   Batch,
@@ -193,9 +194,36 @@ export const Attendance: React.FC = () => {
       });
 
       setHasUnsavedChanges(false);
+
+      let autoMsg = "";
+      if (res.absent_count > 0) {
+        try {
+          const absentStudents = students
+            .filter((s) => s.status === "absent")
+            .map((s) => ({
+              student_id: s.student_id,
+              student_name: s.full_name,
+              parent_phone: s.parent_phone,
+              phone: s.phone,
+            }));
+
+          const autoRes = await whatsappAutomationService.scheduleBatchAttendance5MinDispatch({
+            batchId: selectedBatchId,
+            batchName: currentBatch?.name || "Batch",
+            sessionDate: sessionDate,
+            absentStudents,
+          });
+          if (autoRes.queuedCount > 0) {
+            autoMsg = ` • Scheduled 5-minute delayed WhatsApp absent notices for ${autoRes.queuedCount} parents.`;
+          }
+        } catch (autoErr) {
+          console.warn("Auto-dispatch error:", autoErr);
+        }
+      }
+
       setNotice({
         type: "success",
-        message: `Attendance submitted successfully for ${res.total_marked} students (${res.present_count} present, ${res.absent_count} absent).`,
+        message: `Attendance submitted successfully for ${res.total_marked} students (${res.present_count} present, ${res.absent_count} absent).${autoMsg}`,
       });
 
       // Reload to get updated session info and record IDs

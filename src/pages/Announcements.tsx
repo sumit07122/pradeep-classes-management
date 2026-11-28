@@ -10,10 +10,19 @@ import {
   RefreshCw,
   Edit2,
   Trash2,
+  Sparkles,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Play,
+  Cake,
+  Receipt,
+  BookOpen,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { announcementsService } from "../services/announcementsService";
 import { whatsappService } from "../services/whatsappService";
+import { whatsappAutomationService, type AutomationExecutionResult } from "../services/whatsappAutomationService";
 import { batchesService } from "../services/batchesService";
 import { useAuth } from "../hooks/useAuth";
 import type { Announcement, WhatsAppMessageQueueItem } from "../types/communication";
@@ -21,11 +30,15 @@ import type { Batch } from "../types";
 
 export const Announcements: React.FC = () => {
   const { role } = useAuth();
-  const [activeTab, setActiveTab] = useState<"broadcasts" | "whatsapp_queue">("broadcasts");
+  const [activeTab, setActiveTab] = useState<"broadcasts" | "whatsapp_queue" | "automations">("broadcasts");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [queueItems, setQueueItems] = useState<WhatsAppMessageQueueItem[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Automations Hub State
+  const [runningAutomation, setRunningAutomation] = useState<string | null>(null);
+  const [automationLog, setAutomationLog] = useState<AutomationExecutionResult | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -66,6 +79,32 @@ export const Announcements: React.FC = () => {
     message_body: "",
   });
   const [isSubmittingDispatch, setIsSubmittingDispatch] = useState(false);
+
+  const handleExecuteAutomation = async (
+    name: string,
+    action: () => Promise<AutomationExecutionResult>
+  ) => {
+    setRunningAutomation(name);
+    setErrorNotice(null);
+    setSuccessNotice(null);
+    try {
+      const res = await action();
+      setAutomationLog(res);
+      if (res.error) {
+        setErrorNotice(`${res.automationName}: ${res.error}`);
+      } else {
+        setSuccessNotice(`${res.automationName}: ${res.details}`);
+        // If items were queued, reload queue in background
+        if (res.queuedCount > 0) {
+          whatsappService.getMessageQueue().then((qRes) => setQueueItems(qRes.data));
+        }
+      }
+    } catch (err: any) {
+      setErrorNotice(err.message || `Failed to execute ${name}`);
+    } finally {
+      setRunningAutomation(null);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -370,17 +409,30 @@ export const Announcements: React.FC = () => {
           Broadcast Feed ({announcements.length})
         </button>
         {canBroadcast && (
-          <button
-            onClick={() => setActiveTab("whatsapp_queue")}
-            className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
-              activeTab === "whatsapp_queue"
-                ? "border-[#16466f] text-[#16466f]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <MessageSquare size={17} />
-            WhatsApp Notification Dispatcher
-          </button>
+          <>
+            <button
+              onClick={() => setActiveTab("whatsapp_queue")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "whatsapp_queue"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <MessageSquare size={17} />
+              WhatsApp Notification Dispatcher
+            </button>
+            <button
+              onClick={() => setActiveTab("automations")}
+              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                activeTab === "automations"
+                  ? "border-[#16466f] text-[#16466f]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Sparkles size={17} className="text-amber-500" />
+              Automations Engine Suite
+            </button>
+          </>
         )}
       </div>
 
@@ -599,6 +651,262 @@ export const Announcements: React.FC = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: Automations Suite */}
+      {activeTab === "automations" && (
+        <div className="space-y-6">
+          {/* Engine Banner */}
+          <div className="bg-gradient-to-r from-[#102f50] via-[#16466f] to-[#1c598d] rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+            <div className="relative z-10 max-w-2xl space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold tracking-wide backdrop-blur-sm border border-white/10">
+                <Sparkles size={13} />
+                PRADEEP CLASSES AUTOMATED ENGAGEMENT ENGINE
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                Automated WhatsApp Academic & Operational Triggers
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                Autonomous background routines keep parents updated on student attendance, pending fee invoices,
+                exam scorecards, daily class homework, and birthday greetings with zero manual dispatch overhead.
+              </p>
+            </div>
+            <div className="absolute right-0 top-0 bottom-0 w-80 bg-radial from-amber-400/10 via-transparent to-transparent pointer-events-none" />
+          </div>
+
+          {/* Last Automation Execution Log */}
+          {automationLog && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs text-emerald-900 flex items-start justify-between gap-3 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-extrabold text-sm text-emerald-950">
+                    {automationLog.automationName} Completed
+                  </div>
+                  <div className="text-emerald-800 leading-relaxed font-medium">
+                    {automationLog.details}
+                  </div>
+                  <div className="text-[11px] text-emerald-600 font-mono pt-1">
+                    Processed: {automationLog.processedCount} records • Queued: {automationLog.queuedCount} dispatches • Last Run: {new Date().toLocaleTimeString()}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAutomationLog(null)}
+                className="text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100/60"
+              >
+                Dismiss
+              </Button>
+            </div>
+          )}
+
+          {/* Automations Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* 1. Batch Attendance 5-Min Auto-Dispatch */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                    <Clock size={20} />
+                  </div>
+                  <Badge variant="blue" size="sm">5-Min Auto Trigger</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Batch Attendance 5-Min Delay</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Automatically triggered right after roll call is saved for any batch. Sends absent notices to parents 5 minutes later.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  Dear Parent, [Name] was marked absent from [Batch] on [Date] at Pradeep Classes...
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 size={13} /> Active on Save
+                </span>
+                <span className="text-[10px] text-slate-400">Triggered via Attendance Page</span>
+              </div>
+            </div>
+
+            {/* 2. Daily Absence Digest (6:30 PM) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center font-bold">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <Badge variant="red" size="sm">Daily at 6:30 PM</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Daily Absence Digest</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Scans day-end attendance sessions and sends a single consolidated WhatsApp notice to parents of absent students.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  Dear Parent, [Student Name] was marked absent from today's classes at Pradeep Classes. Please reply if this was informed.
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">Scheduled: 6:30 PM</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={runningAutomation === "Daily Absence Digest"}
+                  onClick={() =>
+                    handleExecuteAutomation("Daily Absence Digest", () =>
+                      whatsappAutomationService.runDailyAbsenceDigest()
+                    )
+                  }
+                  icon={<Play size={13} />}
+                >
+                  Run Scan Now
+                </Button>
+              </div>
+            </div>
+
+            {/* 3. Monthly Fee Due Auto-Reminder (1st & 10th) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                    <Receipt size={20} />
+                  </div>
+                  <Badge variant="amber" size="sm">1st & 10th Monthly</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Monthly Fee Due Reminders</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Scans students with overdue balances and generates personalized payment reminders with exact pending amount and payment link.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  Dear Parent, an overdue balance of ₹[Due] is pending for [Student]... https://app.pradeepclasses.in/portal
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">Overdue Balances</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={runningAutomation === "Monthly Fee Due Reminders"}
+                  onClick={() =>
+                    handleExecuteAutomation("Monthly Fee Due Reminders", () =>
+                      whatsappAutomationService.scanAndQueueMonthlyFeeReminders()
+                    )
+                  }
+                  icon={<Play size={13} />}
+                >
+                  Scan Dues Now
+                </Button>
+              </div>
+            </div>
+
+            {/* 4. Instant Fee Deposit Receipt */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                    <Receipt size={20} />
+                  </div>
+                  <Badge variant="green" size="sm">Instant Trigger</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Instant Fee Deposit Receipt</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Automatically triggered when any fee payment is recorded in the Fee Ledger. Dispatches payment receipt to parent.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  Dear Parent, fee payment of ₹[Amount] for [Student] has been received successfully via [Mode]. Receipt No: [REC]...
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 size={13} /> Active on Payment
+                </span>
+                <span className="text-[10px] text-slate-400">Triggered via Fee Records</span>
+              </div>
+            </div>
+
+            {/* 5. Daily Class Diary & Homework Broadcast (7:00 PM) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                    <BookOpen size={20} />
+                  </div>
+                  <Badge variant="violet" size="sm">Daily at 7:00 PM</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Class Diary & Homework Broadcast</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Sends daily summary of topics covered in class and homework assigned directly to batch parents for home monitoring.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  Dear Parent, Daily Academic Digest for [Batch]: 📚 Topics Covered: ... 📝 Homework Assigned: ...
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">Scheduled: 7:00 PM</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={runningAutomation === "Class Diary & Homework"}
+                  onClick={() =>
+                    handleExecuteAutomation("Class Diary & Homework", () =>
+                      whatsappAutomationService.broadcastDailyDiaryAndHomework()
+                    )
+                  }
+                  icon={<Play size={13} />}
+                >
+                  Broadcast Today
+                </Button>
+              </div>
+            </div>
+
+            {/* 6. Automated Student Birthday Wishes */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-pink-50 text-pink-700 flex items-center justify-center font-bold">
+                    <Cake size={20} />
+                  </div>
+                  <Badge variant="violet" size="sm">Daily at 8:00 AM</Badge>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Student Birthday Greetings</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Automatically scans students celebrating birthdays today and dispatches a warm greeting from the Faculty Team.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 font-mono">
+                  🎉 Happy Birthday to our dear student [Name]! May you achieve great success... Pradeep Classes Faculty Team! 🎂
+                </div>
+              </div>
+              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">Daily Morning Scan</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={runningAutomation === "Birthday Wishes"}
+                  onClick={() =>
+                    handleExecuteAutomation("Birthday Wishes", () =>
+                      whatsappAutomationService.scanAndQueueBirthdayWishes()
+                    )
+                  }
+                  icon={<Play size={13} />}
+                >
+                  Scan Birthdays
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

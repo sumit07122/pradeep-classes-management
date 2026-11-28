@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { whatsappAutomationService } from "./whatsappAutomationService";
 import type {
   FeeRecord,
   FeeSummary,
@@ -395,6 +396,33 @@ export const feesService = {
     });
 
     if (error) throw new Error(error.message);
+
+    // Auto-dispatch instant WhatsApp fee deposit receipt to student's parent
+    if (data && data.success) {
+      try {
+        const { data: rec } = await supabase
+          .from("fee_records")
+          .select("student_id, students (id, full_name, parent_phone, phone)")
+          .eq("id", payload.record_id)
+          .single();
+
+        if (rec && rec.students) {
+          const student = rec.students as any;
+          await whatsappAutomationService.triggerInstantFeeDepositReceipt({
+            studentId: student.id,
+            studentName: student.full_name,
+            amountPaid: payload.amount,
+            paymentMode: payload.payment_mode,
+            receiptId: data.receipt_no || (data.payment_id ? String(data.payment_id) : "REC-FEE"),
+            remainingBalance: typeof data.balance_due === "number" ? data.balance_due : 0,
+            parentPhone: student.parent_phone || student.phone,
+          });
+        }
+      } catch (receiptNoticeErr) {
+        console.warn("Failed to auto-dispatch fee receipt notice:", receiptNoticeErr);
+      }
+    }
+
     return data;
   },
 

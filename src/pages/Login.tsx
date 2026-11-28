@@ -133,6 +133,7 @@ export const Login: React.FC = () => {
             isEmailFocused={isEmailFocused}
             isPasswordFocused={isPasswordFocused}
             showPassword={showPassword}
+            hasPassword={password.length > 0}
             textLength={email.length}
           />
         </div>
@@ -200,6 +201,7 @@ export const Login: React.FC = () => {
               rightElement={
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="p-1 rounded text-slate-400 hover:text-[#16466f] transition focus:outline-none"
                   aria-label={showPassword ? "Hide password" : "Show password"}
@@ -211,7 +213,10 @@ export const Login: React.FC = () => {
             />
 
             <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-800 transition">
+              <label
+                className="flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-800 transition select-none"
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 <input
                   type="checkbox"
                   checked={showPassword}

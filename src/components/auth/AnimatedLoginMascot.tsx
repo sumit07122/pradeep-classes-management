@@ -4,6 +4,7 @@ export interface AnimatedLoginMascotProps {
   isEmailFocused: boolean;
   isPasswordFocused: boolean;
   showPassword: boolean;
+  hasPassword?: boolean;
   textLength?: number;
   className?: string;
 }
@@ -12,6 +13,7 @@ export const AnimatedLoginMascot: React.FC<AnimatedLoginMascotProps> = ({
   isEmailFocused,
   isPasswordFocused,
   showPassword,
+  hasPassword = false,
   textLength = 0,
   className = "",
 }) => {
@@ -19,13 +21,16 @@ export const AnimatedLoginMascot: React.FC<AnimatedLoginMascotProps> = ({
   let pupilOffsetX = 0;
   let pupilOffsetY = 0;
 
-  if (isPasswordFocused) {
+  // The password state is active if the field is focused, has text, or show password is on
+  const isPasswordActive = isPasswordFocused || (hasPassword && !isEmailFocused) || showPassword;
+
+  if (isPasswordActive) {
     if (showPassword) {
-      // Peeking down curiously at the password
-      pupilOffsetX = -2;
+      // Peeking down curiously at the revealed password
+      pupilOffsetX = -2.5;
       pupilOffsetY = 4.5;
     } else {
-      // Closed / covered
+      // Eyes covered
       pupilOffsetX = 0;
       pupilOffsetY = 0;
     }
@@ -37,22 +42,22 @@ export const AnimatedLoginMascot: React.FC<AnimatedLoginMascotProps> = ({
   }
 
   // Determine Paw Transforms
-  // Idle position: translateY(0)
-  // Masked position: covering eyes
-  // Peek position: left covers eye, right lowers & tilts
+  // Idle position: resting at bottom
+  // Masked position: both paws covering eyes snugly
+  // Peek position: left covers eye, right lowers and tilts so right eye peeks!
   let leftPawTransform = "translate(0px, 0px)";
   let rightPawTransform = "translate(0px, 0px)";
 
-  if (isPasswordFocused) {
+  if (isPasswordActive) {
     if (showPassword) {
       // Left paw covers left eye
-      leftPawTransform = "translate(0px, -58px) rotate(-6deg)";
-      // Right paw drops down and tilts away so right eye peeks!
-      rightPawTransform = "translate(16px, -20px) rotate(28deg)";
+      leftPawTransform = "translate(0px, -60px) rotate(-6deg)";
+      // Right paw drops down and tilts away so right eye peeks clearly!
+      rightPawTransform = "translate(24px, -16px) rotate(32deg)";
     } else {
       // Both paws cover eyes ("No peeking!")
-      leftPawTransform = "translate(0px, -58px) rotate(-6deg)";
-      rightPawTransform = "translate(0px, -58px) rotate(6deg)";
+      leftPawTransform = "translate(0px, -60px) rotate(-6deg)";
+      rightPawTransform = "translate(0px, -60px) rotate(6deg)";
     }
   }
 
@@ -217,7 +222,7 @@ export const AnimatedLoginMascot: React.FC<AnimatedLoginMascotProps> = ({
           {/* Right Eyebrow - Raises playfully when peeking */}
           <path
             d={
-              isPasswordFocused && showPassword
+              isPasswordActive && showPassword
                 ? "M 111 67 Q 119 62 127 67" // Raised high for curious peek!
                 : "M 111 71 Q 119 67 127 70"
             }

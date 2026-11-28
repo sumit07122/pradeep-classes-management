@@ -67,7 +67,12 @@ export const StudentPhotoUploadModal: React.FC<StudentPhotoUploadModalProps> = (
       onClose();
     } catch (err: any) {
       console.error("Error in handleConfirmAndLock:", err);
-      setError(err.message || "Failed to upload photo.");
+      const rawMsg = err.message || "";
+      if (rawMsg.includes("row-level security") || rawMsg.includes("policy")) {
+        setError("Storage authorization error: Please ensure you are logged into your student account or contact the administration desk.");
+      } else {
+        setError(rawMsg || "Failed to upload photo. Please try again.");
+      }
     } finally {
       setIsUploading(false);
     }

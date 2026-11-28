@@ -8,11 +8,13 @@ import {
   Lock,
   Edit2,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { Button, Input, Select, Badge, LoadingSpinner, AlertNotice, Modal } from "../components/common";
 import { academicsService } from "../services/academicsService";
 import { batchesService } from "../services/batchesService";
 import { studentsService } from "../services/studentsService";
+import { whatsappAutomationService } from "../services/whatsappAutomationService";
 import { useAuth } from "../hooks/useAuth";
 import type { Exam, ExamMark } from "../types/academics";
 import type { Batch, Student } from "../types";
@@ -38,6 +40,7 @@ export const Academics: React.FC = () => {
     [studentId: string]: { marks_obtained: number; is_absent: boolean; remarks?: string };
   }>({});
   const [scorecardMarks, setScorecardMarks] = useState<ExamMark[]>([]);
+  const [isBroadcastingScorecards, setIsBroadcastingScorecards] = useState(false);
 
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
@@ -172,9 +175,26 @@ export const Academics: React.FC = () => {
     if (res.error) {
       setErrorNotice(res.error);
     } else {
-      setSuccessNotice("Exam marks recorded and graded.");
+      setSuccessNotice("Exam marks recorded and graded. You can now 1-click broadcast personalized WhatsApp scorecards to parents from the scorecard view.");
       setIsMarksModalOpen(false);
       loadData();
+    }
+  };
+
+  const handleBroadcastScorecards = async (examId: string) => {
+    setIsBroadcastingScorecards(true);
+    setErrorNotice(null);
+    try {
+      const res = await whatsappAutomationService.broadcastExamScorecards(examId);
+      if (res.error) {
+        setErrorNotice(res.error);
+      } else {
+        setSuccessNotice(res.details);
+      }
+    } catch (err: any) {
+      setErrorNotice(err.message || "Failed to broadcast scorecards");
+    } finally {
+      setIsBroadcastingScorecards(false);
     }
   };
 
@@ -425,6 +445,19 @@ export const Academics: React.FC = () => {
                       >
                         {exam.is_published ? <Lock size={14} /> : <Share2 size={14} />}
                       </Button>
+
+                      {exam.is_published && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-emerald-700 hover:bg-emerald-50 border-emerald-300"
+                          onClick={() => handleBroadcastScorecards(exam.id)}
+                          title="Broadcast Scorecards via WhatsApp"
+                          isLoading={isBroadcastingScorecards}
+                        >
+                          <MessageSquare size={14} />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -761,9 +794,20 @@ export const Academics: React.FC = () => {
               </table>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white"
+                icon={<MessageSquare size={14} />}
+                isLoading={isBroadcastingScorecards}
+                onClick={() => handleBroadcastScorecards(activeExam.id)}
+              >
+                Broadcast Scorecards via WhatsApp
+              </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setIsScorecardOpen(false)}
               >
                 Close

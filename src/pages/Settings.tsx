@@ -526,7 +526,16 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
             </div>
 
             {/* Assistance & Administration Desk (Only for non-management students/teachers who haven't changed password yet) */}
-            {!isManagement && !hasChangedPassword && (
+            {!isManagement &&
+              !isOwner &&
+              !isAdmin &&
+              !isSuperAdmin &&
+              role !== "owner" &&
+              role !== "admin" &&
+              role !== "super_admin" &&
+              role !== "accountant" &&
+              !user?.email?.toLowerCase().includes("admin@") &&
+              !hasChangedPassword && (
               <div className="mt-4 p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900 relative">
                 <Info size={18} className="text-amber-700 shrink-0 mt-0.5" />
                 <div className="space-y-1 flex-1 pr-6">
