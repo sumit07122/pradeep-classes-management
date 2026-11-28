@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { Input, Button, AlertNotice } from "../components/common";
-import { Mail, Lock, ShieldCheck } from "lucide-react";
+import { Input, Button, AlertNotice, Modal } from "../components/common";
+import { User, Lock, ShieldCheck, Info, Phone, Building2 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const { signIn, authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,13 +51,36 @@ export const Login: React.FC = () => {
 
     let authIdentifier = email.trim();
     if (!authIdentifier.includes("@")) {
-      const lower = authIdentifier.toLowerCase();
-      if (lower.startsWith("pc") || /^[0-9]+$/.test(lower)) {
-        // Normalize student registration number (e.g. PC-2025-0001 -> pc-2025-0001@student.pradeepclasses.in)
-        authIdentifier = `${lower}@student.pradeepclasses.in`;
-      } else {
-        // Normalize faculty username (e.g. avinash.sir -> avinash.sir@faculty.pradeepclasses.in)
-        authIdentifier = `${lower}@faculty.pradeepclasses.in`;
+      // 1. Try to resolve via universal database resolver RPC
+      try {
+        if (supabase) {
+          const { data: resolvedEmail } = await supabase.rpc("resolve_login_identifier", {
+            p_input: authIdentifier,
+          });
+          if (resolvedEmail && typeof resolvedEmail === "string") {
+            authIdentifier = resolvedEmail;
+          }
+        }
+      } catch {
+        // Fallback to offline heuristic
+      }
+
+      // 2. Client fallback heuristic if RPC did not resolve
+      if (!authIdentifier.includes("@")) {
+        const lower = authIdentifier.toLowerCase();
+        if (lower.startsWith("pc") || /^[0-9]+$/.test(lower)) {
+          const digits = lower.replace(/[^0-9]/g, "");
+          const padded = digits ? digits.padStart(4, "0") : "0001";
+          authIdentifier = `pc-2025-${padded}@student.pradeepclasses.in`;
+        } else if (["admin", "owner", "superadmin", "administrator"].includes(lower)) {
+          authIdentifier = "admin@pradeepclasses.in";
+        } else {
+          const cleanName = lower
+            .replace(/(^mr\.?\s+|^dr\.?\s+|\s+sir$)/gi, "")
+            .trim()
+            .replace(/\s+/g, ".");
+          authIdentifier = `${cleanName}.sir@faculty.pradeepclasses.in`;
+        }
       }
     }
 
@@ -136,14 +161,14 @@ export const Login: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Registration Number or Email"
+              label="Registration Number or Faculty Name"
               type="text"
               required
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. PC-2025-0001 or admin@pradeepclasses.in"
-              icon={<Mail size={16} />}
+              placeholder="e.g. PC001, PC-2025-0001, or Avinash Sir"
+              icon={<User size={16} />}
             />
 
             <Input
@@ -164,9 +189,13 @@ export const Login: React.FC = () => {
                 />
                 <span>Remember me</span>
               </label>
-              <span className="text-[#16466f] font-semibold cursor-pointer hover:underline">
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-[#16466f] font-semibold hover:underline bg-transparent border-0 p-0 cursor-pointer"
+              >
                 Forgot password?
-              </span>
+              </button>
             </div>
 
             <Button
@@ -183,10 +212,57 @@ export const Login: React.FC = () => {
 
           <div className="mt-6 pt-5 border-t border-slate-100 text-center">
             <p className="text-[11px] text-slate-500">
-              Protected by Role-Based Access Control and Row Level Security.
+              Students log in via Registration No (e.g. PC001). Faculty via Name (e.g. Avinash Sir).
             </p>
           </div>
         </div>
+
+        {/* Forgot Password Assistance Modal */}
+        <Modal
+          isOpen={showForgotModal}
+          onClose={() => setShowForgotModal(false)}
+          title="Account Login & Password Help"
+          subtitle="INSTITUTE CREDENTIALS DESK"
+          maxWidth="sm"
+        >
+          <div className="space-y-4 text-xs text-slate-700">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 flex items-start gap-2.5">
+              <Info size={18} className="text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <strong>Default Coaching Password:</strong>
+                <p className="leading-relaxed">
+                  Default login password for all students and faculty accounts is:
+                </p>
+                <div className="font-mono font-extrabold text-xs text-[#102f50] bg-white px-2 py-1 rounded border border-amber-300 inline-block mt-0.5">
+                  PRADEEPCLASSES
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <p className="font-bold text-slate-800">Need your password reset or changed?</p>
+              <p className="text-slate-600 leading-relaxed">
+                For account security, student and teacher credentials are reset directly by the Institute Administration. Please reach out to reception or administration:
+              </p>
+              <div className="space-y-1.5 pt-1 font-semibold text-slate-800">
+                <div className="flex items-center gap-2">
+                  <Phone size={14} className="text-[#16466f]" />
+                  <span>Call / WhatsApp: <b>+91 8126180408</b></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Building2 size={14} className="text-[#16466f]" />
+                  <span>Desk: <b>Pradeep Classes Administrative Office</b></span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button variant="primary" onClick={() => setShowForgotModal(false)}>
+                Understood, Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {/* Footer */}
         <div className="text-center mt-6 text-xs text-slate-400">

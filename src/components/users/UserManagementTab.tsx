@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
+  User,
   Users,
   UserPlus,
   Search,
@@ -17,7 +18,6 @@ import {
   EyeOff,
   Sparkles,
   Phone,
-  Mail,
   AlertCircle,
   MessageCircle,
   Trash2,
@@ -89,7 +89,7 @@ Hello ${params.name},
 Your login password for the Pradeep Classes Portal has been successfully updated:
 
 *Portal URL:* ${params.portalUrl}
-*Username / Email:* ${params.username}
+*Login Username / Reg No:* ${params.username}
 *New Password:* ${params.password}
 
 Please log in and keep your password secure. Do not share your login credentials with anyone.`;
@@ -101,7 +101,7 @@ Hello ${params.name},
 Your login credentials for the Pradeep Classes Portal have been set up:
 
 *Portal URL:* ${params.portalUrl}
-*Username / Email:* ${params.username}
+*Login Username / Reg No:* ${params.username}
 *Password:* ${params.password}
 
 Please log in and update your password if desired. Do not share your login credentials with anyone.`;
@@ -394,13 +394,17 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
       setCreateModalError("Password must be at least 6 characters long.");
       return;
     }
-    if (createRole !== "student" && !createEmail.trim()) {
-      setCreateModalError("Email is required for staff, teacher, and admin accounts.");
-      return;
-    }
-    if (createRole === "student" && !selectedStudentId && !createEmail.trim()) {
-      setCreateModalError("Please provide an email/username or link an existing student record.");
-      return;
+    let effectiveEmail = createEmail.trim();
+    if (!effectiveEmail) {
+      if (createRole === "teacher") {
+        effectiveEmail = `${createFullName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@faculty.pradeepclasses.in`;
+      } else if (createRole === "student" && !selectedStudentId) {
+        setCreateModalError("Please select a student record to link or enter a registration number.");
+        return;
+      } else if (createRole === "admin" || createRole === "owner") {
+        setCreateModalError("Username or email is required for administrator accounts.");
+        return;
+      }
     }
 
     setIsCreatingUser(true);
@@ -409,7 +413,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
       const dto: CreateUserDTO = {
         role: createRole,
         full_name: createFullName.trim(),
-        email: createEmail.trim() || undefined,
+        email: effectiveEmail || undefined,
         password: createPassword,
         phone: createPhone.trim() || undefined,
         student_id: createRole === "student" && selectedStudentId ? selectedStudentId : undefined,
@@ -429,10 +433,17 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
         setUsers((prev) => [created, ...prev]);
         setIsCreateModalOpen(false);
 
+        const displayUsername =
+          created.role === "student"
+            ? (created.linked_admission_no || created.email.split("@")[0].toUpperCase())
+            : created.role === "teacher"
+            ? (created.linked_teacher_name || created.full_name)
+            : created.email;
+
         // Open Credentials Summary Modal
         setCreatedCredentials({
           name: created.full_name,
-          username: created.email,
+          username: displayUsername,
           password: createPassword,
           phone: created.phone || createPhone || undefined,
           role: created.role,
@@ -441,7 +452,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
 
         setAlertNotice({
           type: "success",
-          message: `User account for ${created.full_name} (${created.email}) created successfully!`,
+          message: `User account for ${created.full_name} (${displayUsername}) created successfully!`,
         });
       }
     } catch (err: any) {
@@ -764,7 +775,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                   <th className="py-3 px-4">User</th>
-                  <th className="py-3 px-4">Email / Username</th>
+                  <th className="py-3 px-4">Login Username / Reg No</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Linked Record</th>
                   <th className="py-3 px-4 text-center">Status</th>
@@ -812,12 +823,16 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
                         </div>
                       </td>
 
-                      {/* Email / Username */}
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <Mail size={12} className="text-slate-400 shrink-0" />
+                      {/* Login Username / Reg No */}
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-700">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <User size={13} className="text-[#16466f] shrink-0" />
                           <span className="truncate max-w-[200px]" title={u.email}>
-                            {u.email}
+                            {u.role === "student"
+                              ? (u.linked_admission_no || u.email.split("@")[0].toUpperCase())
+                              : u.role === "teacher"
+                              ? (u.linked_teacher_name || u.full_name)
+                              : (u.email.split("@")[0])}
                           </span>
                         </div>
                       </td>
@@ -1023,29 +1038,34 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
             placeholder="e.g. Rahul Sharma"
           />
 
-          {/* Email / Username */}
+          {/* Login Username / Identifier */}
           <div>
             <Input
               label={
                 createRole === "student"
-                  ? "Email / Login Username (Optional for Students)"
-                  : "Email Address (Login Username)"
+                  ? "Registration Number (Optional if student selected)"
+                  : createRole === "teacher"
+                  ? "Faculty Login Name (Optional: auto-uses teacher name)"
+                  : "Admin Login Username"
               }
-              required={createRole !== "student"}
-              type="email"
+              type="text"
               value={createEmail}
               onChange={(e) => setCreateEmail(e.target.value)}
               placeholder={
                 createRole === "student"
-                  ? "Optional: defaults to admission_no@pradeepclasses.in"
-                  : "user@pradeepclasses.in"
+                  ? "e.g. PC001 (auto-derived from admission no if empty)"
+                  : createRole === "teacher"
+                  ? "e.g. Avinash Sir (auto-derived from teacher name if empty)"
+                  : "admin@pradeepclasses.in"
               }
             />
-            {createRole === "student" && !createEmail && (
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                If omitted, an email based on the student's admission number will be automatically generated.
-              </p>
-            )}
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {createRole === "student"
+                ? "Students log in via registration number (e.g. PC001 or PC-2025-0001)."
+                : createRole === "teacher"
+                ? "Faculty log in directly using their name (e.g. Avinash Sir)."
+                : "Enter administrator username or email."}
+            </p>
           </div>
 
           {/* Phone Number */}
@@ -1249,7 +1269,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
               </div>
 
               <div>
-                <span className="text-[11px] text-slate-500 block font-sans">Username / Email:</span>
+                <span className="text-[11px] text-slate-500 block font-sans">Login Username / Reg No:</span>
                 <span className="font-bold text-slate-900 select-all break-all">
                   {createdCredentials.username}
                 </span>

@@ -139,7 +139,7 @@ export const CredentialsModal: React.FC<CredentialsModalProps> = ({
           </div>
 
           <div>
-            <span className="text-[11px] text-slate-500 block font-sans">Username / Email:</span>
+            <span className="text-[11px] text-slate-500 block font-sans">Login Username / Reg No:</span>
             <span className="font-bold text-slate-900 select-all break-all">
               {credentials.username}
             </span>

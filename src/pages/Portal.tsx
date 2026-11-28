@@ -411,7 +411,7 @@ export const Portal: React.FC = () => {
         </div>
         <h2 className="text-xl font-extrabold text-slate-800">Student Account Not Linked</h2>
         <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-          Your portal login account ({user?.email}) is not yet linked to an active student admission record.
+          Your portal login account ({user?.full_name || "Student"}) is not yet linked to an active student admission record.
         </p>
         <p className="text-xs text-slate-400 mt-2">
           Please contact Pradeep Classes administration to connect your student admission number with this account.

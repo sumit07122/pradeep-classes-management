@@ -122,11 +122,9 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
     e.preventDefault();
     if (!fullName.trim()) return;
 
+    const teacherAuthEmail = email.trim() || `${fullName.trim().toLowerCase().replace(/[^a-z0-9]/g, '.')}@faculty.pradeepclasses.in`;
+
     if (generateLogin) {
-      if (!email.trim()) {
-        setErrorNotice("Email address is required to generate a faculty portal login account.");
-        return;
-      }
       if (!tempPassword || tempPassword.length < 6) {
         setErrorNotice("Temporary password must be at least 6 characters long.");
         return;
@@ -162,7 +160,7 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
     if (generateLogin) {
       const userRes = await userService.createInstituteUser({
         full_name: createdTeacher.full_name,
-        email: email.trim(),
+        email: teacherAuthEmail,
         phone: phone.trim() || undefined,
         password: tempPassword,
         role: "teacher",
@@ -184,7 +182,7 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
       setShowModal(false);
       setCreatedCredentials({
         name: createdTeacher.full_name,
-        username: userRes.data.email || email.trim(),
+        username: createdTeacher.full_name,
         password: tempPassword,
         phone: phone.trim() || undefined,
         role: "teacher",
@@ -535,12 +533,11 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
           />
 
           <Input
-            label={`Email Address ${generateLogin ? "*" : "(Optional)"}`}
+            label="Email Address (Optional)"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="e.g. rajesh.sharma@pradeepclasses.in"
-            required={generateLogin}
+            placeholder="Optional reference email (not required for login)"
           />
 
           {/* Portal Access & Login Account */}
@@ -629,7 +626,7 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
                   <p className="text-[11px] text-amber-700 flex items-center gap-1.5 pt-1">
                     <Sparkles size={13} className="text-amber-500 shrink-0" />
                     <span>
-                      Email is required for faculty portal access. The faculty member will log in with their email address.
+                      Faculty members log in directly using their Name (e.g. "{fullName.trim() || "Teacher Name"}"). Default password is PRADEEPCLASSES.
                     </span>
                   </p>
                 </div>
