@@ -22,6 +22,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ className = 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installedSuccess, setInstalledSuccess] = useState(false);
+  const [installNotice, setInstallNotice] = useState<string | null>(null);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -42,6 +43,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ className = 
 
   const handleInstall = async () => {
     setIsInstalling(true);
+    setInstallNotice(null);
     try {
       const success = await triggerInstall();
       if (success) {
@@ -49,7 +51,15 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ className = 
         setTimeout(() => {
           setIsModalOpen(false);
         }, 2200);
+      } else {
+        setInstallNotice(
+          "If the automatic browser prompt did not appear, please tap your browser menu (⋮) and select 'Add to Home Screen' or 'Install App'."
+        );
       }
+    } catch {
+      setInstallNotice(
+        "Please install via your browser menu (⋮) -> 'Install App' or 'Add to Home Screen'."
+      );
     } finally {
       setIsInstalling(false);
     }
@@ -115,6 +125,14 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ className = 
                 <X size={18} />
               </button>
             </div>
+
+            {/* Helpful Notice Alert */}
+            {installNotice && (
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2">
+                <span className="text-sm">💡</span>
+                <span className="leading-relaxed">{installNotice}</span>
+              </div>
+            )}
 
             {/* Dynamic Modal Content */}
             {installedSuccess ? (

@@ -17,7 +17,6 @@ import {
   Receipt,
   Briefcase,
   X,
-  ChevronDown,
   LogOut,
   ShieldCheck,
 } from "lucide-react";
@@ -28,6 +27,8 @@ import { RoleSwitcherDev } from "./RoleSwitcherDev";
 export interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   userRole: UserRole;
   userName?: string;
   onSignOut: () => void;
@@ -155,6 +156,8 @@ const NAV_ITEMS: NavItem[] = [
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
+  isCollapsed = false,
+  onToggleCollapse,
   userRole,
   userName = "Administrator",
   onSignOut,
@@ -168,53 +171,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside
       className={`sidebar ${
         isOpen ? "sidebar-open" : ""
-      } flex flex-col justify-between overflow-y-auto`}
+      } ${isCollapsed ? "sidebar-collapsed" : ""} flex flex-col justify-between overflow-y-auto`}
     >
       <div>
-        {/* Brand */}
-        <Link
-          to={
-            userRole === "student"
-              ? "/portal"
-              : userRole === "super_admin"
-              ? "/platform"
-              : "/dashboard"
-          }
-          className="brand hover:opacity-95 transition cursor-pointer"
-        >
-          <img
-            src="/logo.png"
-            alt="Pradeep Classes"
-            className="w-10 h-10 object-contain rounded-xl bg-white p-0.5 shadow-sm border border-slate-200 shrink-0"
-          />
-          <div>
-            <strong>Pradeep Classes</strong>
-            <span>INSTITUTE MANAGEMENT</span>
-          </div>
+        {/* Brand Header */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#244565]">
+          <Link
+            to={
+              userRole === "student"
+                ? "/portal"
+                : userRole === "super_admin"
+                ? "/platform"
+                : "/dashboard"
+            }
+            className="brand hover:opacity-95 transition cursor-pointer flex-1"
+          >
+            <img
+              src="/logo.png"
+              alt="Pradeep Classes"
+              className="w-9 h-9 object-contain rounded-xl bg-white p-0.5 shadow-sm border border-slate-200 shrink-0"
+            />
+            <div className="overflow-hidden">
+              <strong className="truncate">Pradeep Classes</strong>
+              <span>INSTITUTE MANAGEMENT</span>
+            </div>
+          </Link>
           <button
-            className="mobile-close icon-button ml-auto"
+            className="sidebar-close-btn p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#1a4166] transition shrink-0 ml-1"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onClose();
+              if (onToggleCollapse && typeof window !== "undefined" && window.innerWidth > 760) {
+                onToggleCollapse();
+              } else {
+                onClose();
+              }
             }}
-            aria-label="Close navigation"
+            title="Hide Sidebar"
+            aria-label="Hide sidebar"
           >
             <X size={18} />
           </button>
-        </Link>
-
-        {/* Institute Workspace Switcher */}
-        <div className="institute-switch">
-          <img
-            src="/logo.png"
-            alt="PC"
-            className="w-8 h-8 object-contain rounded-lg bg-white p-0.5 shrink-0"
-          />
-          <div className="overflow-hidden">
-            <b>Pradeep Classes</b>
-          </div>
-          <ChevronDown size={15} />
         </div>
 
         {/* Navigation Section */}

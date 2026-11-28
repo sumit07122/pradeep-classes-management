@@ -6,6 +6,8 @@ import { PWAInstallPrompt } from "../common/PWAInstallPrompt";
 
 export interface TopbarProps {
   onOpenMobileNav: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarCollapsed?: boolean;
   pageTitle: string;
   userRole: UserRole;
   userName?: string;
@@ -14,6 +16,8 @@ export interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({
   onOpenMobileNav,
+  onToggleSidebar,
+  isSidebarCollapsed = false,
   pageTitle,
   userRole,
   userName = "Administrator",
@@ -39,11 +43,12 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   return (
     <header className="topbar">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
-          className="mobile-menu icon-button"
-          onClick={onOpenMobileNav}
-          aria-label="Open mobile navigation"
+          className="sidebar-toggle-btn icon-button"
+          onClick={onToggleSidebar || onOpenMobileNav}
+          aria-label={isSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+          title={isSidebarCollapsed ? "Show sidebar navigation" : "Hide sidebar navigation"}
         >
           <Menu size={20} />
         </button>

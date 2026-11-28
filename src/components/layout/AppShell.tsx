@@ -21,7 +21,28 @@ export const AppShell: React.FC<AppShellProps> = ({
   onSignOut,
   onDevRoleChange,
 }) => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("pc_sidebar_collapsed") === "true";
+    }
+    return false;
+  });
+
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth <= 760) {
+      setMobileNavOpen((prev) => !prev);
+    } else {
+      setIsSidebarCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("pc_sidebar_collapsed", String(next));
+        } catch {}
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="app-shell flex">
@@ -29,6 +50,8 @@ export const AppShell: React.FC<AppShellProps> = ({
       <Sidebar
         isOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
         userRole={userRole}
         userName={userName}
         onSignOut={onSignOut}
@@ -45,9 +68,11 @@ export const AppShell: React.FC<AppShellProps> = ({
       )}
 
       {/* Main Content Area */}
-      <main className="main-area flex-1 flex flex-col min-h-screen">
+      <main className={`main-area flex-1 flex flex-col min-h-screen ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         <Topbar
           onOpenMobileNav={() => setMobileNavOpen(true)}
+          onToggleSidebar={handleToggleSidebar}
+          isSidebarCollapsed={isSidebarCollapsed}
           pageTitle={pageTitle}
           userRole={userRole}
           userName={userName}

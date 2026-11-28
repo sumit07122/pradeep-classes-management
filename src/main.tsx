@@ -12,9 +12,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>
 );
 
-// Register Service Worker in production with log confirmation
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
+// Register Service Worker for PWA (registers reliably regardless of document.readyState)
+if ("serviceWorker" in navigator) {
+  const registerSW = () => {
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
@@ -23,5 +23,11 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
       .catch((error) => {
         console.warn("[PWA] Service Worker registration failed:", error);
       });
-  });
+  };
+
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    registerSW();
+  } else {
+    window.addEventListener("load", registerSW);
+  }
 }

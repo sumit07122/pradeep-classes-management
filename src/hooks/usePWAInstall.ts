@@ -19,7 +19,12 @@ export interface UsePWAInstallReturn {
 }
 
 export function usePWAInstall(): UsePWAInstallReturn {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => {
+    if (typeof window !== "undefined" && (window as any).__deferredPWAInstallPrompt) {
+      return (window as any).__deferredPWAInstallPrompt;
+    }
+    return null;
+  });
 
   // Detect standalone mode (already running installed)
   const [isStandalone, setIsStandalone] = useState<boolean>(() => {
@@ -44,6 +49,11 @@ export function usePWAInstall(): UsePWAInstallReturn {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Check early captured prompt
+    if ((window as any).__deferredPWAInstallPrompt && !deferredPrompt) {
+      setDeferredPrompt((window as any).__deferredPWAInstallPrompt);
+    }
+
     // Check display-mode media query changes
     const mediaQuery = window.matchMedia?.("(display-mode: standalone)");
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
@@ -62,6 +72,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
     // Capture Chrome/Edge/Android beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      (window as any).__deferredPWAInstallPrompt = e;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
@@ -69,6 +80,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      (window as any).__deferredPWAInstallPrompt = null;
       console.log("[PWA] Pradeep Classes app was successfully installed");
     };
 
@@ -84,19 +96,23 @@ export function usePWAInstall(): UsePWAInstallReturn {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
-  }, []);
+  }, [deferredPrompt]);
 
   const triggerInstall = useCallback(async (): Promise<boolean> => {
-    if (!deferredPrompt) {
+    const promptEvent = deferredPrompt || (typeof window !== "undefined" ? (window as any).__deferredPWAInstallPrompt : null);
+    if (!promptEvent) {
       return false;
     }
 
     try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
       if (choice.outcome === "accepted") {
         setIsInstalled(true);
         setDeferredPrompt(null);
+        if (typeof window !== "undefined") {
+          (window as any).__deferredPWAInstallPrompt = null;
+        }
         return true;
       }
       return false;
