@@ -269,10 +269,52 @@ export async function deleteInstituteUser(
   }
 }
 
+/**
+ * Administratively update a user's login username / registration handle.
+ * Calls RPC admin_update_user_username which handles auth.users, auth.identities,
+ * students.admission_no, and audit_logs synchronization.
+ */
+export async function updateUserUsername(
+  userId: string,
+  newUsername: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    if (!userId) {
+      return { success: false, error: "User ID is required." };
+    }
+    if (!newUsername || !newUsername.trim()) {
+      return { success: false, error: "New username cannot be empty." };
+    }
+
+    const client = await getClient();
+    if (!client) {
+      return { success: false, error: "Supabase client is not configured." };
+    }
+
+    const { data, error } = await client.rpc("admin_update_user_username", {
+      p_user_id: userId,
+      p_new_username: newUsername.trim(),
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data && typeof data === "object" && data.status === "error") {
+      return { success: false, error: data.message || "Failed to update username." };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to update username." };
+  }
+}
+
 export const userService = {
   listInstituteUsers,
   createInstituteUser,
   resetUserPassword,
   toggleUserStatus,
   deleteInstituteUser,
+  updateUserUsername,
 };

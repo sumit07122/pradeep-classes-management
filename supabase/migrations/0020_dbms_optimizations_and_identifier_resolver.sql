@@ -82,6 +82,7 @@ DECLARE
   v_digits text;
   v_matched_email text;
   v_search_name text;
+  v_normalized text;
 BEGIN
   IF p_input IS NULL OR trim(p_input) = '' THEN
     RETURN NULL;
@@ -94,7 +95,20 @@ BEGIN
     RETURN v_cleaned;
   END IF;
 
-  -- 2. Check if student registration number (e.g. 'PC001', 'PC-2025-0001', 'pc01', '1', etc.)
+  -- 2. Direct match against auth.users by email prefix or username handle
+  v_normalized := regexp_replace(v_cleaned, '[^a-z0-9]', '.', 'g');
+  SELECT lower(email) INTO v_matched_email
+  FROM auth.users
+  WHERE lower(email) = v_cleaned
+     OR lower(split_part(email, '@', 1)) = v_cleaned
+     OR lower(split_part(email, '@', 1)) = v_normalized
+  LIMIT 1;
+
+  IF v_matched_email IS NOT NULL THEN
+    RETURN v_matched_email;
+  END IF;
+
+  -- 3. Check if student registration number (e.g. 'PC001', 'PC-2025-0001', 'pc01', '1', etc.)
   IF v_cleaned LIKE 'pc%' OR v_cleaned ~ '^[0-9]+$' THEN
     -- Extract only digits
     v_digits := regexp_replace(v_cleaned, '[^0-9]', '', 'g');

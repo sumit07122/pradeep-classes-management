@@ -21,6 +21,7 @@ import {
   AlertCircle,
   MessageCircle,
   Trash2,
+  UserCog,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice, Modal } from "../common";
 import { userService } from "../../services/userService";
@@ -224,6 +225,81 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
   const [deleteTargetUser, setDeleteTargetUser] = useState<InstituteUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Edit Username Modal State
+  const [editUsernameTargetUser, setEditUsernameTargetUser] = useState<InstituteUser | null>(null);
+  const [newUsernameValue, setNewUsernameValue] = useState("");
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [editUsernameError, setEditUsernameError] = useState<string | null>(null);
+
+  const handleOpenEditUsernameModal = (u: InstituteUser) => {
+    setEditUsernameTargetUser(u);
+    setEditUsernameError(null);
+    let defaultVal = "";
+    if (u.role === "student") {
+      defaultVal = u.linked_admission_no || u.email.split("@")[0].toUpperCase();
+    } else if (u.role === "teacher") {
+      defaultVal = u.linked_teacher_name || u.full_name;
+    } else {
+      defaultVal = u.email.split("@")[0];
+    }
+    setNewUsernameValue(defaultVal);
+  };
+
+  const handleUpdateUsernameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUsernameTargetUser) return;
+    if (!newUsernameValue.trim()) {
+      setEditUsernameError("Username / Registration Code cannot be empty.");
+      return;
+    }
+
+    setIsUpdatingUsername(true);
+    setEditUsernameError(null);
+    try {
+      const res = await userService.updateUserUsername(
+        editUsernameTargetUser.id,
+        newUsernameValue.trim()
+      );
+      if (!res.success) {
+        setEditUsernameError(res.error || "Failed to update username.");
+      } else {
+        const updatedNewHandle = newUsernameValue.trim();
+        setUsers((prev) =>
+          prev.map((u) => {
+            if (u.id === editUsernameTargetUser.id) {
+              const updated = { ...u };
+              if (u.role === "student") {
+                updated.linked_admission_no = updatedNewHandle.toUpperCase();
+                updated.email = `${updatedNewHandle.toLowerCase()}@pradeepclasses.in`;
+                if (updated.linked_student) {
+                  updated.linked_student = {
+                    ...updated.linked_student,
+                    admission_no: updatedNewHandle.toUpperCase(),
+                  };
+                }
+              } else {
+                updated.email = updatedNewHandle.includes("@")
+                  ? updatedNewHandle.toLowerCase()
+                  : `${updatedNewHandle.toLowerCase().replace(/[^a-z0-9]/g, "")}@pradeepclasses.in`;
+              }
+              return updated;
+            }
+            return u;
+          })
+        );
+        setAlertNotice({
+          type: "success",
+          message: `Username for ${editUsernameTargetUser.full_name} has been updated to "${updatedNewHandle}"!`,
+        });
+        setEditUsernameTargetUser(null);
+      }
+    } catch (err: any) {
+      setEditUsernameError(err?.message || "Failed to update username.");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!deleteTargetUser) return;
@@ -882,6 +958,17 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Edit Username */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditUsernameModal(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition shadow-xs"
+                            title="Edit login username / registration handle"
+                          >
+                            <UserCog size={12} className="text-[#16466f]" />
+                            <span>Edit Username</span>
+                          </button>
+
                           {/* Reset Password */}
                           <button
                             type="button"
@@ -1407,6 +1494,89 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* MODAL: Edit Username */}
+      <Modal
+        isOpen={Boolean(editUsernameTargetUser)}
+        onClose={() => setEditUsernameTargetUser(null)}
+        title="Edit Login Username"
+        subtitle="ADMINISTRATIVE CREDENTIAL MANAGEMENT"
+        maxWidth="md"
+      >
+        {editUsernameTargetUser && (
+          <form onSubmit={handleUpdateUsernameSubmit} className="space-y-4">
+            {editUsernameError && (
+              <AlertNotice
+                type="error"
+                message={editUsernameError}
+                onDismiss={() => setEditUsernameError(null)}
+              />
+            )}
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 text-sm">
+                  {editUsernameTargetUser.full_name}
+                </span>
+                <Badge variant={getRoleBadgeVariant(editUsernameTargetUser.role)} size="sm">
+                  {editUsernameTargetUser.role}
+                </Badge>
+              </div>
+              <p className="text-slate-500 text-[11px]">
+                {editUsernameTargetUser.role === "student"
+                  ? "Changing this username automatically updates their student Admission / Registration Number (e.g. PC001) and student portal login handle."
+                  : editUsernameTargetUser.role === "teacher"
+                  ? "Changing this username updates the faculty member's login name handle (e.g. Avinash Sir)."
+                  : "Changing this username updates the admin or staff member's direct login handle."}
+              </p>
+            </div>
+
+            <Input
+              label={
+                editUsernameTargetUser.role === "student"
+                  ? "New Registration Number / Username"
+                  : editUsernameTargetUser.role === "teacher"
+                  ? "New Faculty Login Name"
+                  : "New Login Username"
+              }
+              required
+              value={newUsernameValue}
+              onChange={(e) => setNewUsernameValue(e.target.value)}
+              placeholder={
+                editUsernameTargetUser.role === "student"
+                  ? "e.g. PC001 or PC082"
+                  : editUsernameTargetUser.role === "teacher"
+                  ? "e.g. Avinash Sir"
+                  : "e.g. admin or staff_account"
+              }
+              helperText={
+                editUsernameTargetUser.role === "student"
+                  ? "Students can log into the student portal using either their full code or short number."
+                  : "Teachers and staff can log in directly using this exact name."
+              }
+            />
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setEditUsernameTargetUser(null)}
+                disabled={isUpdatingUsername}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isUpdatingUsername}
+                icon={<UserCog size={14} />}
+              >
+                Save Username
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
