@@ -20,6 +20,7 @@ import {
   Mail,
   AlertCircle,
   MessageCircle,
+  Trash2,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice, Modal } from "../common";
 import { userService } from "../../services/userService";
@@ -218,6 +219,34 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
 
   // Toggling status state
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  // Delete User Modal State
+  const [deleteTargetUser, setDeleteTargetUser] = useState<InstituteUser | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteUser = async () => {
+    if (!deleteTargetUser) return;
+    setIsDeletingUser(true);
+    setDeleteError(null);
+    try {
+      const res = await userService.deleteInstituteUser(deleteTargetUser.id);
+      if (res.error) {
+        setDeleteError(res.error);
+      } else {
+        setUsers((prev) => prev.filter((u) => u.id !== deleteTargetUser.id));
+        setAlertNotice({
+          type: "success",
+          message: `User account for ${deleteTargetUser.full_name} (${deleteTargetUser.email}) was deleted and unlinked successfully.`,
+        });
+        setDeleteTargetUser(null);
+      }
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete user account.");
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
 
   // Load users from service if not initially provided
   const loadUsers = async () => {
@@ -873,6 +902,22 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
                               </>
                             )}
                           </button>
+
+                          {/* Delete / Unlink Account */}
+                          {u.role !== "owner" && u.role !== "super_admin" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteTargetUser(u);
+                                setDeleteError(null);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-rose-200 text-rose-700 bg-white hover:bg-rose-50 transition shadow-xs"
+                              title="Delete login account (unlinks record without deleting data)"
+                            >
+                              <Trash2 size={12} />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1284,6 +1329,64 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({
             </div>
           </div>
         )}
+      </Modal>
+      {/* MODAL: Delete User Confirmation */}
+      <Modal
+        isOpen={Boolean(deleteTargetUser)}
+        onClose={() => setDeleteTargetUser(null)}
+        title="Delete User Login Account"
+        subtitle="IMMUTABLE RECORD PRESERVATION"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <AlertNotice
+              type="error"
+              message={deleteError}
+              onDismiss={() => setDeleteError(null)}
+            />
+          )}
+
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-start gap-2.5">
+            <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <strong>Confirm Login Account Removal:</strong>
+              <p className="leading-relaxed">
+                Are you sure you want to delete the login account for <b>{deleteTargetUser?.full_name}</b> ({deleteTargetUser?.email})?
+              </p>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-600 space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <p className="font-semibold text-slate-800">What happens when you delete this account:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Portal login access and credentials for this user will be permanently revoked.</li>
+              <li>Any linked student profile or teacher records will remain <b>completely safe and intact</b>.</li>
+              <li>Past attendance, historical fee collections, test marks, and academic diaries are <b>100% preserved</b>.</li>
+              <li>You can create a new login account for this person at any time.</li>
+            </ul>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDeleteTargetUser(null)}
+              disabled={isDeletingUser}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleDeleteUser}
+              isLoading={isDeletingUser}
+              icon={<Trash2 size={14} />}
+            >
+              Yes, Delete Account
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

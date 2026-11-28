@@ -481,6 +481,15 @@ export const Teachers: React.FC<TeachersProps> = ({ initialShowModal = false }) 
                       </button>
                     )}
                   </div>
+
+                  <div className="mt-2 flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-50">
+                    <div className="flex items-center gap-1">
+                      <KeyRound size={12} className={t.profile_id ? "text-emerald-600" : "text-slate-400"} />
+                      <span className={t.profile_id ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                        {t.profile_id ? "Portal Login Active" : "No Login Linked"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               );
             })}

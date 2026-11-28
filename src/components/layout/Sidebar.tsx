@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Receipt,
   Briefcase,
-  Database,
   X,
   ChevronDown,
   LogOut,
@@ -140,12 +139,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
-    label: "Data Migration",
-    path: "/migration",
-    icon: Database,
-    roles: ["super_admin", "owner", "admin"],
-  },
-  {
     label: "Student Portal",
     path: "/portal",
     icon: Users,
@@ -228,9 +221,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="nav-caption">WORKSPACE ({userRole.toUpperCase()})</div>
         <nav className="space-y-1">
           {allowedNav.map((item) => {
+            const isExact = location.pathname === item.path;
+            const hasMoreSpecificMatch = allowedNav.some(
+              (other) =>
+                other.path !== item.path &&
+                other.path.startsWith(item.path) &&
+                location.pathname.startsWith(other.path)
+            );
             const isActive =
-              location.pathname === item.path ||
-              (item.path !== "/dashboard" && location.pathname.startsWith(item.path));
+              isExact ||
+              (!hasMoreSpecificMatch &&
+                item.path !== "/dashboard" &&
+                item.path !== "/" &&
+                location.pathname.startsWith(item.path + "/"));
             const Icon = item.icon;
             return (
               <Link

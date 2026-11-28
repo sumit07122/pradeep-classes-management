@@ -46,11 +46,24 @@ export const Login: React.FC = () => {
 
     setIsSubmitting(true);
     clearError();
-    const result = await signIn(email, password);
+
+    let authIdentifier = email.trim();
+    if (!authIdentifier.includes("@")) {
+      const lower = authIdentifier.toLowerCase();
+      if (lower.startsWith("pc") || /^[0-9]+$/.test(lower)) {
+        // Normalize student registration number (e.g. PC-2025-0001 -> pc-2025-0001@student.pradeepclasses.in)
+        authIdentifier = `${lower}@student.pradeepclasses.in`;
+      } else {
+        // Normalize faculty username (e.g. avinash.sir -> avinash.sir@faculty.pradeepclasses.in)
+        authIdentifier = `${lower}@faculty.pradeepclasses.in`;
+      }
+    }
+
+    const result = await signIn(authIdentifier, password);
     setIsSubmitting(false);
 
     if (result.success) {
-      const userRole = (result as any).role || (email.toLowerCase().includes("student") ? "student" : "admin");
+      const userRole = (result as any).role || (authIdentifier.toLowerCase().includes("student") ? "student" : "admin");
       let destination = from;
 
       if (userRole === "student") {
@@ -123,13 +136,13 @@ export const Login: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Email address"
-              type="email"
+              label="Registration Number or Email"
+              type="text"
               required
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@pradeepclasses.in"
+              placeholder="e.g. PC-2025-0001 or admin@pradeepclasses.in"
               icon={<Mail size={16} />}
             />
 

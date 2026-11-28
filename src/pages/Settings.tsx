@@ -7,6 +7,7 @@ import {
   User,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
   GraduationCap,
   Users,
   Database,
@@ -290,17 +291,19 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
               <MessageSquare size={17} />
               WhatsApp Cloud API Integration
             </button>
-            <button
-              onClick={() => setActiveTab("backup")}
-              className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
-                activeTab === "backup"
-                  ? "border-[#16466f] text-[#16466f]"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Database size={17} />
-              Backup & Crisis Recovery
-            </button>
+            {role === "super_admin" && (
+              <button
+                onClick={() => setActiveTab("backup")}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+                  activeTab === "backup"
+                    ? "border-[#16466f] text-[#16466f]"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Database size={17} />
+                Backup & Crisis Recovery
+              </button>
+            )}
           </>
         )}
       </div>
@@ -357,6 +360,7 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
               <Input
                 label="Full Name"
                 required
+                disabled={role === "student"}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
@@ -371,6 +375,7 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
               <Input
                 label="Contact Phone"
                 placeholder="+91 98765 43210"
+                disabled={role === "student"}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
@@ -380,6 +385,15 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
                 value="Pradeep Classes (Main Campus)"
               />
             </div>
+
+            {role === "student" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-center gap-2">
+                <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                <span>
+                  <strong>Student Identity Protected:</strong> Your registered name, admission records, and phone contact are permanently locked. Please contact the institute admin for any official corrections.
+                </span>
+              </div>
+            )}
 
             {/* If Student: Show Academic Info */}
             {role === "student" && linkedDetails && (
@@ -440,6 +454,7 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
                 type="submit"
                 variant="primary"
                 isLoading={isSaving}
+                disabled={role === "student"}
                 icon={<Save size={16} />}
               >
                 Save Profile Details
@@ -777,8 +792,8 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
         <UserManagementTab />
       )}
 
-      {/* TAB 5: Backup, Crisis Recovery & Clean Handover */}
-      {isManagement && activeTab === "backup" && (
+      {/* TAB 5: Backup, Crisis Recovery & Clean Handover (Super Admin Platform Only) */}
+      {role === "super_admin" && isManagement && activeTab === "backup" && (
         <BackupAndRecoveryTab />
       )}
     </div>

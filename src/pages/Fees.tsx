@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Download, RefreshCw, MessageSquare, Layers, Users } from "lucide-react";
+import { Plus, Download, RefreshCw, MessageSquare, Layers, Users, History } from "lucide-react";
 import { Button, AlertNotice, LoadingSpinner, EmptyState } from "../components/common";
 import {
   FeeStatsSummary,
@@ -11,6 +11,7 @@ import {
   FeeStructuresModal,
   BatchInvoiceModal,
 } from "../components/fees";
+import { HistoricalFeeModal } from "../components/fees/HistoricalFeeModal";
 import { WhatsAppNotificationModal, type NotificationTarget } from "../components/whatsapp/WhatsAppNotificationModal";
 import { feesService } from "../services/feesService";
 import { useAuth } from "../hooks/useAuth";
@@ -39,6 +40,7 @@ export const Fees: React.FC = () => {
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isFeeStructuresOpen, setIsFeeStructuresOpen] = useState(false);
   const [isBatchInvoiceOpen, setIsBatchInvoiceOpen] = useState(false);
+  const [isHistoricalFeeOpen, setIsHistoricalFeeOpen] = useState(false);
   const [collectRecord, setCollectRecord] = useState<FeeRecord | null>(null);
   const [historyRecord, setHistoryRecord] = useState<FeeRecord | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
@@ -222,6 +224,14 @@ export const Fees: React.FC = () => {
                 Fee Plans
               </Button>
               <Button
+                variant="outline"
+                onClick={() => setIsHistoricalFeeOpen(true)}
+                icon={<History size={14} className="text-amber-700" />}
+                className="border-amber-200 bg-amber-50/70 text-amber-900 hover:bg-amber-100"
+              >
+                Record Historical
+              </Button>
+              <Button
                 variant="secondary"
                 onClick={() => setIsBatchInvoiceOpen(true)}
                 icon={<Users size={14} className="text-blue-600" />}
@@ -317,6 +327,15 @@ export const Fees: React.FC = () => {
         onClose={() => setIsBatchInvoiceOpen(false)}
         onInvoicesGenerated={() => {
           setNotice({ type: "success", message: "Batch fee invoices generated successfully." });
+          loadFeesData();
+        }}
+      />
+
+      <HistoricalFeeModal
+        isOpen={isHistoricalFeeOpen}
+        onClose={() => setIsHistoricalFeeOpen(false)}
+        onSuccess={() => {
+          setNotice({ type: "success", message: "Prior historical fee payment recorded successfully." });
           loadFeesData();
         }}
       />

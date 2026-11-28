@@ -500,6 +500,51 @@ export const studentsService = {
       };
     }
   },
+
+  /**
+   * Upload passport photo from student account and permanently lock photo, name, and phone
+   */
+  async uploadStudentPhotoAndLock(
+    studentId: string,
+    file: File
+  ): Promise<{ success: boolean; photo_url?: string; error?: string }> {
+    if (!supabase) return { success: false, error: "Database not configured." };
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const fileName = `${studentId}_${Date.now()}.${ext}`;
+      const filePath = `photos/${fileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("student-photos")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadErr) {
+        console.error("Storage upload error:", uploadErr);
+        throw uploadErr;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("student-photos")
+        .getPublicUrl(filePath);
+
+      const photoUrl = publicUrlData.publicUrl;
+
+      const { error: rpcErr } = await supabase.rpc("lock_student_profile", {
+        p_student_id: studentId,
+        p_photo_url: photoUrl,
+      });
+
+      if (rpcErr) {
+        console.error("Lock student profile error:", rpcErr);
+        throw rpcErr;
+      }
+
+      return { success: true, photo_url: photoUrl };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to upload photo and lock profile." };
+    }
+  },
+
   setSupabaseClient,
 };
 

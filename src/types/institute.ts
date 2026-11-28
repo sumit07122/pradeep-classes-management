@@ -33,6 +33,8 @@ export interface Student {
   parent_email?: string;
   notes?: string;
   photo_url?: string;
+  is_profile_locked?: boolean;
+  photo_uploaded_at?: string;
   status: StudentStatus;
   status_reason?: string;
   status_changed_at?: string;

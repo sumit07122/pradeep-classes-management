@@ -51,6 +51,8 @@ export interface FeeRecord {
   notes: string | null;
   fee_structure_id: string | null;
   institute_id: string;
+  is_historical?: boolean;
+  historical_period?: string;
   created_at: string;
   updated_at: string;
 }

@@ -214,11 +214,11 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Data Migration Center */}
+      {/* Data Migration Center (Platform Developer Only) */}
       <Route
         path="/migration"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin"]}>
             {wrapWithShell("Data Migration Center", <DataMigration />)}
           </ProtectedRoute>
         }

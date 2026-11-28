@@ -107,7 +107,14 @@ export const FeeRecordTable: React.FC<FeeRecordTableProps> = ({
 
                     {/* Batch & Title */}
                     <td className="py-3 px-4">
-                      <div className="font-medium text-slate-800">{r.title}</div>
+                      <div className="font-medium text-slate-800 flex items-center gap-1.5 flex-wrap">
+                        <span>{r.title}</span>
+                        {r.is_historical && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                            Historical
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-500">{r.batch_name}</div>
                     </td>
 

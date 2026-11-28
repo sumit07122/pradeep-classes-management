@@ -11,6 +11,8 @@ import {
   Clock,
   Printer,
   ShieldAlert,
+  ShieldCheck,
+  Camera,
   Flame,
   Trophy,
   FileCheck2,
@@ -28,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { StatCard, Badge, LoadingSpinner, Button, AlertNotice, Modal } from "../components/common";
+import { StudentPhotoUploadModal } from "../components/portal/StudentPhotoUploadModal";
 import { attendanceService } from "../services/attendanceService";
 import { feesService } from "../services/feesService";
 import { academicsService } from "../services/academicsService";
@@ -72,7 +75,12 @@ export const Portal: React.FC = () => {
     batch_id: string;
     batch_name: string;
     course_name: string;
+    photo_url?: string | null;
+    is_profile_locked?: boolean;
+    phone?: string;
   } | null>(null);
+
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
 
   const [attendanceStats, setAttendanceStats] = useState<StudentAttendanceStats | null>(null);
   const [recentLogs, setRecentLogs] = useState<
@@ -139,7 +147,7 @@ export const Portal: React.FC = () => {
       // Find the student profile matching current user
       const { data: studentData } = await supabase
         .from("students")
-        .select("id, full_name, admission_no, batch_id, batches(name, course_name)")
+        .select("id, full_name, admission_no, batch_id, photo_url, is_profile_locked, phone, batches(name, course_name)")
         .eq("profile_id", user.id)
         .maybeSingle();
 
@@ -160,6 +168,9 @@ export const Portal: React.FC = () => {
           batch_id: targetStudent.batch_id,
           batch_name: (targetStudent.batches as any)?.name || "Assigned Batch",
           course_name: (targetStudent.batches as any)?.course_name || "Enrolled Course",
+          photo_url: targetStudent.photo_url || null,
+          is_profile_locked: Boolean(targetStudent.is_profile_locked),
+          phone: targetStudent.phone,
         });
 
         // Parallel fetch for attendance, fees, exams, materials, timetable, sessions, announcements, gamification, certificates, documents, doubts, homework
@@ -420,17 +431,53 @@ export const Portal: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Student Banner */}
-      <div className="bg-gradient-to-r from-[#102f50] to-[#1d5284] rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-[#f4b942] font-extrabold">
-            STUDENT ACADEMIC PORTAL
+      <div className="bg-gradient-to-r from-[#102f50] to-[#1d5284] rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          {/* Passport Photo Box */}
+          {studentInfo.photo_url ? (
+            <div className="relative w-20 h-24 rounded-xl overflow-hidden border-2 border-white/60 shadow-md shrink-0 bg-slate-800">
+              <img
+                src={studentInfo.photo_url}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-0 inset-x-0 bg-emerald-950/90 text-[8px] tracking-wider text-emerald-300 font-extrabold text-center py-0.5 flex items-center justify-center gap-0.5">
+                <ShieldCheck size={9} />
+                LOCKED
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsPhotoModalOpen(true)}
+              className="w-20 h-24 rounded-xl border-2 border-dashed border-amber-300/80 bg-white/10 hover:bg-white/20 transition flex flex-col items-center justify-center text-center p-2 text-white shrink-0 group shadow-inner"
+              title="Click to Upload Official Passport Photo"
+            >
+              <Camera size={22} className="text-amber-300 group-hover:scale-110 transition-transform mb-1" />
+              <span className="text-[9px] font-extrabold leading-tight text-amber-200">
+                UPLOAD PHOTO
+              </span>
+            </button>
+          )}
+
+          <div>
+            <div className="text-xs uppercase tracking-widest text-[#f4b942] font-extrabold">
+              STUDENT ACADEMIC PORTAL
+            </div>
+            <h1 className="text-2xl font-extrabold mt-1 tracking-tight">{displayName}</h1>
+            <p className="text-xs text-slate-300 mt-1 flex items-center gap-3 flex-wrap">
+              <span>Admission No: <strong className="text-white font-mono">{admissionNo}</strong></span>
+              <span>•</span>
+              <span>Batch: <strong className="text-white">{batchName}</strong></span>
+              {studentInfo.is_profile_locked && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded">
+                    <ShieldCheck size={12} /> Identity Locked
+                  </span>
+                </>
+              )}
+            </p>
           </div>
-          <h1 className="text-2xl font-extrabold mt-1 tracking-tight">{displayName}</h1>
-          <p className="text-xs text-slate-300 mt-1 flex items-center gap-3">
-            <span>Admission No: <strong className="text-white font-mono">{admissionNo}</strong></span>
-            <span>•</span>
-            <span>Batch: <strong className="text-white">{batchName}</strong></span>
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -1712,6 +1759,26 @@ export const Portal: React.FC = () => {
           isOpen={!!activeReceipt}
           onClose={() => setActiveReceipt(null)}
           receipt={activeReceipt}
+        />
+      )}
+
+      {/* Student Passport Photo Upload & Lock Modal */}
+      {isPhotoModalOpen && studentInfo && (
+        <StudentPhotoUploadModal
+          isOpen={isPhotoModalOpen}
+          onClose={() => setIsPhotoModalOpen(false)}
+          studentId={studentInfo.id}
+          studentName={displayName}
+          admissionNo={admissionNo}
+          onSuccess={(photoUrl) => {
+            setStudentInfo((prev) =>
+              prev ? { ...prev, photo_url: photoUrl, is_profile_locked: true } : null
+            );
+            setPortalNotice({
+              type: "success",
+              message: "Passport photo uploaded successfully and identity profile is permanently locked.",
+            });
+          }}
         />
       )}
     </div>

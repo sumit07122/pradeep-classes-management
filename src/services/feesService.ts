@@ -40,6 +40,8 @@ export const feesService = {
           notes,
           fee_structure_id,
           institute_id,
+          is_historical,
+          historical_period,
           created_at,
           updated_at,
           students (
@@ -93,6 +95,8 @@ export const feesService = {
           notes: row.notes,
           fee_structure_id: row.fee_structure_id,
           institute_id: row.institute_id,
+          is_historical: Boolean(row.is_historical),
+          historical_period: row.historical_period || undefined,
           created_at: row.created_at,
           updated_at: row.updated_at,
         };
@@ -510,6 +514,8 @@ export const feesService = {
           notes: row.notes,
           fee_structure_id: row.fee_structure_id,
           institute_id: row.institute_id,
+          is_historical: Boolean(row.is_historical),
+          historical_period: row.historical_period || undefined,
           created_at: row.created_at,
           updated_at: row.updated_at,
         };
@@ -590,5 +596,53 @@ export const feesService = {
     link.download = `Pradeep_Classes_Fee_Ledger_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Record a prior historical fee payment manually from admin console
+   */
+  async recordHistoricalPayment(payload: {
+    student_id: string;
+    amount: number;
+    paid_date: string;
+    historical_period: string;
+    receipt_no: string;
+    payment_mode: "cash" | "upi" | "cheque" | "bank_transfer";
+    transaction_ref?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; data?: FeeRecord; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database service is not configured." };
+    }
+
+    try {
+      const instituteId = "11111111-2222-3333-4444-555555555555";
+      const { data, error } = await supabase
+        .from("fee_records")
+        .insert({
+          student_id: payload.student_id,
+          title: `Historical Tuition Fee - ${payload.historical_period}`,
+          amount: payload.amount,
+          paid_amount: payload.amount,
+          discount_amount: 0,
+          status: "paid",
+          due_date: payload.paid_date,
+          paid_date: payload.paid_date,
+          receipt_no: payload.receipt_no.trim(),
+          payment_mode: payload.payment_mode,
+          transaction_ref: payload.transaction_ref || null,
+          notes: payload.notes || "Prior historical fee record logged manually from admin console",
+          is_historical: true,
+          historical_period: payload.historical_period,
+          institute_id: instituteId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to record historical fee payment" };
+    }
   },
 };

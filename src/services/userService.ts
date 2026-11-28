@@ -234,9 +234,45 @@ export async function toggleUserStatus(
   }
 }
 
+/**
+ * Permanently delete or unlink a user account.
+ * Calls RPC admin_delete_institute_user.
+ */
+export async function deleteInstituteUser(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!userId) {
+      return { success: false, error: "User ID is required." };
+    }
+
+    const client = await getClient();
+    if (!client) {
+      return { success: false, error: "Supabase client is not configured." };
+    }
+
+    const { data, error } = await client.rpc("admin_delete_institute_user", {
+      p_user_id: userId,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data && typeof data === "object" && data.status === "error") {
+      return { success: false, error: data.message || "Failed to delete user." };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to delete user." };
+  }
+}
+
 export const userService = {
   listInstituteUsers,
   createInstituteUser,
   resetUserPassword,
   toggleUserStatus,
+  deleteInstituteUser,
 };
