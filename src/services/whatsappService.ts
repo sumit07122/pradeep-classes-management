@@ -104,6 +104,121 @@ export const whatsappService = {
   },
 
   /**
+   * Create a new manual WhatsApp dispatch
+   */
+  async createQueueItem(params: {
+    recipient_phone: string;
+    recipient_name?: string;
+    message_body: string;
+    event_type?: string;
+    student_id?: string;
+  }): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+
+    try {
+      const cleanPhone = params.recipient_phone.replace(/\D/g, "");
+      if (cleanPhone.length < 10) {
+        return { success: false, error: "Recipient phone number must have at least 10 digits." };
+      }
+      if (!params.message_body || !params.message_body.trim()) {
+        return { success: false, error: "Message body cannot be empty." };
+      }
+
+      const { data, error } = await supabase
+        .from("whatsapp_message_queue")
+        .insert({
+          institute_id: "11111111-2222-3333-4444-555555555555",
+          student_id: params.student_id || null,
+          recipient_phone: cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone,
+          recipient_name: params.recipient_name?.trim() || "Recipient",
+          event_type: params.event_type || "announcement",
+          template_name: "custom_message",
+          message_body: params.message_body.trim(),
+          status: "pending",
+          attempts: 0,
+          max_attempts: 3,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to create WhatsApp dispatch." };
+    }
+  },
+
+  /**
+   * Update an existing WhatsApp dispatch in queue
+   */
+  async updateQueueItem(
+    id: string,
+    params: {
+      recipient_phone?: string;
+      recipient_name?: string;
+      message_body?: string;
+      status?: "pending" | "sent" | "failed" | "skipped_test_mode";
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+
+    try {
+      const updateData: any = {};
+      if (params.recipient_phone) {
+        const cleanPhone = params.recipient_phone.replace(/\D/g, "");
+        updateData.recipient_phone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      }
+      if (params.recipient_name !== undefined) {
+        updateData.recipient_name = params.recipient_name.trim();
+      }
+      if (params.message_body !== undefined) {
+        if (!params.message_body.trim()) {
+          return { success: false, error: "Message body cannot be empty." };
+        }
+        updateData.message_body = params.message_body.trim();
+      }
+      if (params.status) {
+        updateData.status = params.status;
+      }
+
+      const { error } = await supabase
+        .from("whatsapp_message_queue")
+        .update(updateData)
+        .eq("id", id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to update WhatsApp dispatch." };
+    }
+  },
+
+  /**
+   * Permanently remove a dispatch from the WhatsApp queue
+   */
+  async deleteQueueItem(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: "Database not configured" };
+    }
+
+    try {
+      const { error } = await supabase
+        .from("whatsapp_message_queue")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to delete dispatch." };
+    }
+  },
+
+  /**
    * Check if a duplicate notification was already queued/sent today
    */
   async checkDuplicateNotification(

@@ -51,6 +51,22 @@ export const Announcements: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetryingId, setIsRetryingId] = useState<string | null>(null);
 
+  // WhatsApp Dispatch Form & Modal State
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [editingDispatchId, setEditingDispatchId] = useState<string | null>(null);
+  const [whatsappForm, setWhatsappForm] = useState<{
+    recipient_phone: string;
+    recipient_name: string;
+    event_type: string;
+    message_body: string;
+  }>({
+    recipient_phone: "",
+    recipient_name: "",
+    event_type: "announcement",
+    message_body: "",
+  });
+  const [isSubmittingDispatch, setIsSubmittingDispatch] = useState(false);
+
   useEffect(() => {
     loadData();
   }, [activeTab]);
@@ -194,6 +210,94 @@ export const Announcements: React.FC = () => {
     }
   };
 
+  const handleOpenCreateWhatsAppDispatch = () => {
+    setEditingDispatchId(null);
+    setWhatsappForm({
+      recipient_phone: "",
+      recipient_name: "",
+      event_type: "manual_broadcast",
+      message_body: "",
+    });
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleStartEditWhatsAppDispatch = (item: WhatsAppMessageQueueItem) => {
+    setEditingDispatchId(item.id);
+    setWhatsappForm({
+      recipient_phone: item.phone_number,
+      recipient_name: item.student_name || "",
+      event_type: item.message_type || "manual_broadcast",
+      message_body: item.message_body,
+    });
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleDeleteWhatsAppDispatch = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this WhatsApp dispatch from queue?")) {
+      return;
+    }
+    setErrorNotice(null);
+    const res = await whatsappService.deleteQueueItem(id);
+    if (res.success) {
+      setSuccessNotice("WhatsApp dispatch deleted successfully.");
+      loadData();
+    } else {
+      setErrorNotice(res.error || "Failed to delete WhatsApp dispatch.");
+    }
+  };
+
+  const handleCreateOrUpdateWhatsAppDispatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!whatsappForm.recipient_phone.trim()) {
+      setErrorNotice("Recipient phone number is required.");
+      return;
+    }
+    if (!whatsappForm.message_body.trim()) {
+      setErrorNotice("Message body cannot be empty.");
+      return;
+    }
+
+    setIsSubmittingDispatch(true);
+    setErrorNotice(null);
+
+    let res;
+    if (editingDispatchId) {
+      res = await whatsappService.updateQueueItem(editingDispatchId, {
+        recipient_phone: whatsappForm.recipient_phone,
+        recipient_name: whatsappForm.recipient_name,
+        message_body: whatsappForm.message_body,
+      });
+    } else {
+      res = await whatsappService.createQueueItem({
+        recipient_phone: whatsappForm.recipient_phone,
+        recipient_name: whatsappForm.recipient_name,
+        event_type: whatsappForm.event_type,
+        message_body: whatsappForm.message_body,
+      });
+    }
+
+    setIsSubmittingDispatch(false);
+
+    if (res.error) {
+      setErrorNotice(res.error);
+    } else {
+      setSuccessNotice(
+        editingDispatchId
+          ? "WhatsApp dispatch updated successfully."
+          : "New WhatsApp dispatch enqueued successfully."
+      );
+      setIsWhatsAppModalOpen(false);
+      setEditingDispatchId(null);
+      setWhatsappForm({
+        recipient_phone: "",
+        recipient_name: "",
+        event_type: "manual_broadcast",
+        message_body: "",
+      });
+      loadData();
+    }
+  };
+
   const canBroadcast = role === "super_admin" || role === "owner" || role === "admin";
 
   return (
@@ -212,14 +316,23 @@ export const Announcements: React.FC = () => {
           {activeTab === "whatsapp_queue" && (
             <>
               {canBroadcast && (
-                <Button
-                  variant="primary"
-                  icon={<Send size={15} />}
-                  isLoading={isDispatching}
-                  onClick={handleDispatchQueue}
-                >
-                  Dispatch Pending Queue
-                </Button>
+                <>
+                  <Button
+                    variant="primary"
+                    icon={<Plus size={15} />}
+                    onClick={handleOpenCreateWhatsAppDispatch}
+                  >
+                    New Dispatch
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    icon={<Send size={15} />}
+                    isLoading={isDispatching}
+                    onClick={handleDispatchQueue}
+                  >
+                    Dispatch Queue
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
@@ -446,17 +559,40 @@ export const Announcements: React.FC = () => {
                         {new Date(q.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        {(q.status === "failed" || q.status === "skipped_test_mode") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            isLoading={isRetryingId === q.id}
-                            icon={<RotateCw size={13} />}
-                            onClick={() => handleRetryMessage(q.id)}
-                          >
-                            Retry
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {(q.status === "failed" || q.status === "skipped_test_mode") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              isLoading={isRetryingId === q.id}
+                              icon={<RotateCw size={13} />}
+                              onClick={() => handleRetryMessage(q.id)}
+                              title="Retry dispatch"
+                            >
+                              Retry
+                            </Button>
+                          )}
+                          {canBroadcast && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditWhatsAppDispatch(q)}
+                                className="p-1.5 text-slate-400 hover:text-[#16466f] hover:bg-slate-100 rounded-md transition"
+                                title="Edit Dispatch"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWhatsAppDispatch(q.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                                title="Delete Dispatch"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -550,6 +686,95 @@ export const Announcements: React.FC = () => {
                 icon={<Send size={16} />}
               >
                 {editingId ? "Save Changes" : "Publish Broadcast"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* WhatsApp Dispatch Modal (Create / Edit) */}
+      {isWhatsAppModalOpen && (
+        <Modal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => {
+            setIsWhatsAppModalOpen(false);
+            setEditingDispatchId(null);
+          }}
+          title={editingDispatchId ? "Edit WhatsApp Dispatch" : "Create New WhatsApp Dispatch"}
+        >
+          <form onSubmit={handleCreateOrUpdateWhatsAppDispatch} className="space-y-4">
+            <Input
+              label="Recipient Phone Number"
+              placeholder="e.g. 9812345678 or 919812345678"
+              value={whatsappForm.recipient_phone}
+              onChange={(e) =>
+                setWhatsappForm({ ...whatsappForm, recipient_phone: e.target.value })
+              }
+              required
+              helperText="10-digit mobile number. Country code 91 is formatted automatically."
+            />
+
+            <Input
+              label="Recipient / Student Name (Optional)"
+              placeholder="e.g. Rahul Sharma"
+              value={whatsappForm.recipient_name}
+              onChange={(e) =>
+                setWhatsappForm({ ...whatsappForm, recipient_name: e.target.value })
+              }
+            />
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Event / Dispatch Category
+              </label>
+              <select
+                value={whatsappForm.event_type}
+                onChange={(e) =>
+                  setWhatsappForm({ ...whatsappForm, event_type: e.target.value })
+                }
+                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#16466f]"
+              >
+                <option value="announcement">Official Announcement Broadcast</option>
+                <option value="fee_receipt">Fee Payment / Dues Notice</option>
+                <option value="attendance_absent">Attendance Absence Alert</option>
+                <option value="test_message">Test / General Notice</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">
+                Message Content <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#16466f]"
+                rows={4}
+                required
+                placeholder="Type the message to be dispatched via WhatsApp..."
+                value={whatsappForm.message_body}
+                onChange={(e) =>
+                  setWhatsappForm({ ...whatsappForm, message_body: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsWhatsAppModalOpen(false);
+                  setEditingDispatchId(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isSubmittingDispatch}
+                icon={<Send size={15} />}
+              >
+                {editingDispatchId ? "Save Changes" : "Enqueue WhatsApp Message"}
               </Button>
             </div>
           </form>

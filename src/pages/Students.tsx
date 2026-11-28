@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { studentsService, type LiveBatchOption } from "../services/studentsService";
 import {
@@ -156,6 +157,17 @@ export const Students: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/student_credentials_batch_roster.pdf"
+            download="Pradeep_Classes_Student_Credentials_Batch_Roster.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition shadow-xs"
+            title="Download printable batch-wise student login credentials PDF (81 students)"
+          >
+            <FileText size={15} className="text-[#16466f]" />
+            <span>Credentials PDF (81 Students)</span>
+          </a>
           <Button
             variant="secondary"
             onClick={handleExport}

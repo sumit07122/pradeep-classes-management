@@ -42,6 +42,12 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [hasChangedPassword, setHasChangedPassword] = useState(() => {
+    if (typeof window !== "undefined" && user?.id) {
+      return localStorage.getItem(`pc_pwd_changed_${user.id}`) === "true";
+    }
+    return false;
+  });
 
   const [loading, setLoading] = useState(initialLoading);
   const [isSaving, setIsSaving] = useState(false);
@@ -141,6 +147,10 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
       });
 
       if (error) throw error;
+      if (user?.id) {
+        localStorage.setItem(`pc_pwd_changed_${user.id}`, "true");
+        setHasChangedPassword(true);
+      }
       setSuccessNotice("Your password has been changed securely.");
       setNewPassword("");
       setConfirmPassword("");
@@ -509,21 +519,23 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
               </Button>
             </div>
 
-            {/* Assistance & Administration Desk */}
-            <div className="mt-4 p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900">
-              <Info size={18} className="text-amber-700 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <span className="font-bold block">Need Credentials Assistance or Forgot Password?</span>
-                <p className="text-amber-800 leading-relaxed">
-                  Default password for all students and faculty accounts is <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">PRADEEPCLASSES</code>.
-                  If you forgot your password or need an immediate reset, please contact the Coaching Administration Desk:
-                </p>
-                <div className="flex flex-wrap gap-4 pt-1 font-semibold text-amber-900">
-                  <span>📞 Call / WhatsApp: +91 8126180408</span>
-                  <span>📍 Reception Desk: Pradeep Classes Administrative Block</span>
+            {/* Assistance & Administration Desk (Only for non-management students/teachers who haven't changed password yet) */}
+            {!isManagement && !hasChangedPassword && (
+              <div className="mt-4 p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900">
+                <Info size={18} className="text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold block">Need Credentials Assistance or Forgot Password?</span>
+                  <p className="text-amber-800 leading-relaxed">
+                    Default password for all students and faculty accounts is <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">PRADEEPCLASSES</code>.
+                    If you forgot your password or need an immediate reset, please contact the Coaching Administration Desk:
+                  </p>
+                  <div className="flex flex-wrap gap-4 pt-1 font-semibold text-amber-900">
+                    <span>📞 Call / WhatsApp: +91 8126180408</span>
+                    <span>📍 Reception Desk: Pradeep Classes Administrative Block</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </form>
         </div>
       )}
