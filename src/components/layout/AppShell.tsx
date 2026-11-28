@@ -45,7 +45,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   };
 
   return (
-    <div className="app-shell flex">
+    <div className="app-shell w-full max-w-full overflow-x-hidden min-h-screen relative">
       {/* Sidebar */}
       <Sidebar
         isOpen={mobileNavOpen}
@@ -68,7 +68,11 @@ export const AppShell: React.FC<AppShellProps> = ({
       )}
 
       {/* Main Content Area */}
-      <main className={`main-area flex-1 flex flex-col min-h-screen ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <main
+        className={`main-area min-w-0 max-w-full overflow-x-hidden flex flex-col min-h-screen ${
+          isSidebarCollapsed ? "sidebar-collapsed" : ""
+        }`}
+      >
         <Topbar
           onOpenMobileNav={() => setMobileNavOpen(true)}
           onToggleSidebar={handleToggleSidebar}
@@ -79,7 +83,9 @@ export const AppShell: React.FC<AppShellProps> = ({
           onSignOut={onSignOut}
         />
 
-        <div className="page-content flex-1">{children}</div>
+        <div className="page-content flex-1 w-full max-w-full min-w-0 overflow-x-hidden">
+          {children}
+        </div>
 
         <footer className="footer">
           <span>© 2026 Pradeep Classes</span>

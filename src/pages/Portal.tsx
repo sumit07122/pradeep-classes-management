@@ -429,9 +429,9 @@ export const Portal: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* Student Banner */}
-      <div className="bg-gradient-to-r from-[#102f50] to-[#1d5284] rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-[#102f50] to-[#1d5284] rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 max-w-full overflow-hidden">
         <div className="flex items-center gap-4">
           {/* Passport Photo Box */}
           {studentInfo.photo_url ? (
@@ -511,7 +511,7 @@ export const Portal: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 overflow-x-auto">
+      <div className="flex border-b border-slate-200 overflow-x-auto max-w-full pb-0.5">
         <button
           onClick={() => setActiveTab("overview")}
           className={`px-5 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition flex items-center gap-2 ${
