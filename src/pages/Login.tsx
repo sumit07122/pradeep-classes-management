@@ -2,12 +2,16 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Input, Button, AlertNotice, Modal } from "../components/common";
-import { User, Lock, ShieldCheck, Info, Phone, Building2 } from "lucide-react";
+import { User, Lock, ShieldCheck, Info, Phone, Building2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { AnimatedLoginMascot } from "../components/auth/AnimatedLoginMascot";
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const { signIn, authError, clearError } = useAuth();
@@ -109,22 +113,32 @@ export const Login: React.FC = () => {
     <div className="min-h-screen flex flex-col justify-center items-center bg-[#f0f4f9] px-4 py-12">
       <div className="w-full max-w-md">
         {/* Brand Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4">
           <img
             src="/logo.png"
             alt="Pradeep Classes"
-            className="w-20 h-20 object-contain mx-auto mb-3 bg-white rounded-2xl p-1 shadow-md border border-slate-200"
+            className="w-16 h-16 object-contain mx-auto mb-2 bg-white rounded-2xl p-1 shadow-md border border-slate-200"
           />
           <h1 className="text-2xl font-extrabold text-[#102f50] font-['Manrope'] tracking-tight">
             Pradeep Classes
           </h1>
-          <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mt-1">
+          <p className="text-xs uppercase tracking-widest font-bold text-slate-500 mt-0.5">
             Institute Management Portal
           </p>
         </div>
 
+        {/* Animated Scholar Mascot Peeking Over Login Card */}
+        <div className="relative -mb-3 z-10">
+          <AnimatedLoginMascot
+            isEmailFocused={isEmailFocused}
+            isPasswordFocused={isPasswordFocused}
+            showPassword={showPassword}
+            textLength={email.length}
+          />
+        </div>
+
         {/* Card */}
-        <div className="bg-white rounded-2xl p-8 border border-slate-200/80 shadow-xl shadow-slate-200/50">
+        <div className="bg-white rounded-2xl p-8 border border-slate-200/80 shadow-xl shadow-slate-200/50 relative z-20">
           <div className="mb-6">
             <h2 className="text-lg font-bold text-slate-800">Sign in to your account</h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -167,27 +181,44 @@ export const Login: React.FC = () => {
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setIsEmailFocused(true)}
+              onBlur={() => setIsEmailFocused(false)}
               placeholder="e.g. PC001, PC-2025-0001, or Avinash Sir"
               icon={<User size={16} />}
             />
 
             <Input
               label="Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => setIsPasswordFocused(true)}
+              onBlur={() => setIsPasswordFocused(false)}
               placeholder="••••••••"
               icon={<Lock size={16} />}
+              rightElement={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="p-1 rounded text-slate-400 hover:text-[#16466f] transition focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              }
             />
 
             <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-600">
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-800 transition">
                 <input
                   type="checkbox"
-                  className="rounded border-slate-300 text-[#16466f] focus:ring-[#16466f]"
+                  checked={showPassword}
+                  onChange={(e) => setShowPassword(e.target.checked)}
+                  className="rounded border-slate-300 text-[#16466f] focus:ring-[#16466f] cursor-pointer"
                 />
-                <span>Remember me</span>
+                <span>Show password</span>
               </label>
               <button
                 type="button"

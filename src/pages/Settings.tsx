@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Users,
   Database,
+  X,
 } from "lucide-react";
 import { Button, Input, Badge, LoadingSpinner, AlertNotice } from "../components/common";
 import { settingsService } from "../services/settingsService";
@@ -23,11 +24,16 @@ import { BackupAndRecoveryTab } from "../components/settings/BackupAndRecoveryTa
 export const Settings: React.FC<{ initialLoading?: boolean }> = ({
   initialLoading = true,
 }) => {
-  const { role, user } = useAuth();
-  const isManagement = ["super_admin", "owner", "admin"].includes(role);
+  const { role, user, isOwner, isAdmin, isSuperAdmin } = useAuth();
+  const isManagement = Boolean(
+    isOwner ||
+    isAdmin ||
+    isSuperAdmin ||
+    ["super_admin", "owner", "admin"].includes(role || "")
+  );
 
   const [activeTab, setActiveTab] = useState<"my-profile" | "profile" | "whatsapp" | "users" | "backup">(
-    isManagement ? "my-profile" : "my-profile"
+    "my-profile"
   );
 
   const [instituteSettings, setInstituteSettings] = useState<InstituteSettings | null>(null);
@@ -521,9 +527,9 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
 
             {/* Assistance & Administration Desk (Only for non-management students/teachers who haven't changed password yet) */}
             {!isManagement && !hasChangedPassword && (
-              <div className="mt-4 p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900">
+              <div className="mt-4 p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900 relative">
                 <Info size={18} className="text-amber-700 shrink-0 mt-0.5" />
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1 pr-6">
                   <span className="font-bold block">Need Credentials Assistance or Forgot Password?</span>
                   <p className="text-amber-800 leading-relaxed">
                     Default password for all students and faculty accounts is <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">PRADEEPCLASSES</code>.
@@ -534,6 +540,18 @@ export const Settings: React.FC<{ initialLoading?: boolean }> = ({
                     <span>📍 Reception Desk: Pradeep Classes Administrative Block</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user?.id) localStorage.setItem(`pc_pwd_changed_${user.id}`, "true");
+                    setHasChangedPassword(true);
+                  }}
+                  className="absolute top-2.5 right-2.5 text-amber-700 hover:text-amber-950 p-1 rounded"
+                  title="Dismiss notice"
+                  aria-label="Dismiss notice"
+                >
+                  <X size={14} />
+                </button>
               </div>
             )}
           </form>
