@@ -67,7 +67,7 @@ export const AppRoutes: React.FC = () => {
           role === "student" ? (
             <Navigate to="/portal" replace />
           ) : (
-            <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "teacher"]}>
+            <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant", "teacher"]}>
               {wrapWithShell("Overview", <Dashboard />)}
             </ProtectedRoute>
           )
@@ -118,7 +118,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/fees"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant"]}>
             {wrapWithShell("Fee Management", <Fees />)}
           </ProtectedRoute>
         }
@@ -128,7 +128,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant"]}>
             {wrapWithShell("Finance & Analytics", <FinanceDashboard />)}
           </ProtectedRoute>
         }
@@ -138,7 +138,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/expenses"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant"]}>
             {wrapWithShell("Expense Ledger", <Expenses />)}
           </ProtectedRoute>
         }
@@ -148,7 +148,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/finance/payroll"
         element={
-          <ProtectedRoute allowedRoles={["owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant"]}>
             {wrapWithShell("Teacher Payroll", <TeacherPayroll />)}
           </ProtectedRoute>
         }
@@ -208,7 +208,7 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "owner", "admin", "accountant"]}>
             {wrapWithShell("Reports & Export", <Reports />)}
           </ProtectedRoute>
         }

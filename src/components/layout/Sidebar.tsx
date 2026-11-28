@@ -53,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Overview",
     path: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["super_admin", "owner", "admin", "teacher"],
+    roles: ["super_admin", "owner", "admin", "accountant", "teacher"],
   },
   {
     label: "Students",
@@ -83,25 +83,25 @@ const NAV_ITEMS: NavItem[] = [
     label: "Fee Records",
     path: "/fees",
     icon: IndianRupee,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
     label: "Finance & Analytics",
     path: "/finance",
     icon: TrendingUp,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
     label: "Expense Ledger",
     path: "/finance/expenses",
     icon: Receipt,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
     label: "Teacher Payroll",
     path: "/finance/payroll",
     icon: Briefcase,
-    roles: ["owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
     label: "Exams & Marks",
@@ -137,7 +137,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Reports",
     path: "/reports",
     icon: FileSpreadsheet,
-    roles: ["super_admin", "owner", "admin"],
+    roles: ["super_admin", "owner", "admin", "accountant"],
   },
   {
     label: "Data Migration",
